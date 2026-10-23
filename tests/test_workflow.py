@@ -293,3 +293,47 @@ def test_astra_rejects_out_of_bounds_model_proposal(tmp_path,monkeypatch):
     with pytest.raises(ValueError,match='超出保守边界'):
         review.astra_review(scene,store.path(scene.id),views,out)
     assert scene.model_dump()==original
+
+
+def test_asset_recipes_reject_unbounded_values_and_duplicate_ids():
+    from real2sim_workbench.asset_refinement import PARAMS,check_recipes
+    import copy
+    recipe={'id':'a','template':'button_box','button_color':'red','parameters':{k:(lo+hi)/2 for k,(lo,hi) in PARAMS.items()}}
+    check_recipes({'assets':[recipe]},['a'])
+    bad=copy.deepcopy(recipe);bad['parameters']['head_length']=float('nan')
+    with pytest.raises(ValueError,match='bounds'):check_recipes({'assets':[bad]},['a'])
+    bad=copy.deepcopy(recipe);bad['parameters']['housing_height']=.85;bad['parameters']['cap_height']=.15
+    with pytest.raises(ValueError,match='stem'):check_recipes({'assets':[bad]},['a'])
+    with pytest.raises(ValueError,match='IDs'):check_recipes({'assets':[recipe,recipe]},['a','b'])
+
+
+def test_parametric_asset_geometry_is_closed_and_frame_roundtrips():
+    from real2sim_workbench.asset_refinement import PARAMS,build_template,canonical_frame
+    params={k:(lo+hi)/2 for k,(lo,hi) in PARAMS.items()}
+    for template,extents in [('hammer',[.5,.1,.12]),('button_box',[.14,.13,.18])]:
+        mesh=build_template({'template':template,'parameters':params,'button_color':'red'},extents)
+        assert mesh.is_watertight and mesh.volume>0 and np.isfinite(mesh.vertices).all()
+        assert mesh.extents[0]==pytest.approx(extents[0],rel=.01)
+        transform,_=canonical_frame(mesh)
+        assert np.linalg.det(transform[:3,:3])==pytest.approx(1.)
+        copy=mesh.copy();copy.apply_transform(transform);copy.apply_transform(np.linalg.inv(transform))
+        np.testing.assert_allclose(copy.vertices,mesh.vertices,atol=1e-10)
+
+
+def test_asset_only_action_preserves_active_geometry_and_scene_reports(tmp_path,monkeypatch):
+    from real2sim_workbench import asset_refinement
+    store,scene=scene_pair(tmp_path)
+    scene.reports={'export':{'path':'original'},'validation':{'physics_check_pass':True},'views':{'path':'before'},'astra_review':{'accepted':True}}
+    store.save(scene)
+    original=store.load(scene.id)
+    def refine(candidate,project,folder,ids):
+        assert ids==[scene.objects[0].id]
+        candidate.reports['asset_refinement']={'stage':'asset_only','active_objects_unchanged':True}
+    monkeypatch.setattr(asset_refinement,'refine_assets',refine)
+    with TestClient(create_app(store.root)) as client:
+        job=client.post('/api/projects/'+scene.id+'/actions/asset_refine',json={'object_ids':[scene.objects[0].id]}).json()
+        assert wait(client,job)['state']=='done'
+    current=store.load(scene.id)
+    assert current.objects==original.objects
+    for key,value in original.reports.items():assert current.reports[key]==value
+    assert current.reports['asset_refinement']['stage']=='asset_only'

@@ -32,6 +32,7 @@ class SelectionAcceptRequest(Record):
 
 class ActionRequest(Record):
     seconds: float = Field(default=3, ge=.1, le=30)
+    object_ids: list[str] | None = Field(default=None, max_length=20)
 
 
 def create_app(root=None):
@@ -86,7 +87,7 @@ def create_app(root=None):
                 revision = scene.revision
                 operation(scene, folder)
                 # Any geometry/layout change invalidates earlier validation/export.
-                if kind not in ("validate", "export", "capture", "review", "selection_preview"):
+                if kind not in ("validate", "export", "capture", "review", "selection_preview", "asset_refine"):
                     scene.reports.pop("validation", None)
                     scene.reports.pop("export", None)
                     scene.reports.pop("views",None)
@@ -301,7 +302,7 @@ def create_app(root=None):
 
     @app.post("/api/projects/{sid}/actions/{action}")
     def action(sid: str, action: str, req: ActionRequest):
-        if action not in ("proxy", "initialize", "optimize", "validate", "export", "reconstruct", "settle", "capture", "review"):
+        if action not in ("proxy", "initialize", "optimize", "validate", "export", "reconstruct", "settle", "capture", "review", "asset_refine"):
             raise HTTPException(404, "未知操作")
         if action == "reconstruct" and not adapters.status()["sam3d"]["configured"]:
             raise ValueError("SAM 3D Objects 尚无可用环境或权重；不会自动替换为占位模型")
@@ -321,6 +322,9 @@ def create_app(root=None):
                     raise ValueError("选中物体需要先具有几何")
                 scene.reports["optimization"] = (physics.optimize_contacts(scene,store.path(sid),folder/"contacts")
                     if all(o.geometry=="sam3d" for o in scene.objects if o.selected) else geometry.optimize(scene))
+            elif action == "asset_refine":
+                from .asset_refinement import refine_assets
+                refine_assets(scene,store.path(sid),folder,req.object_ids)
             elif action == "review":
                 from .review import review_and_refine
                 review_and_refine(scene,store.path(sid),folder)

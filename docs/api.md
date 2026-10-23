@@ -37,3 +37,11 @@ action 可选 proxy、initialize、optimize、settle、validate、export、recon
 - `review`：采集视角、调用本机已登录的 Codex CLI / `gpt-6-astra`、约束建议、候选仿真和轮廓对比，采纳或拒绝后再次输出场景/物理报告/视角。调用失败如实失败，先前可用的场景不丢失。
 
 `GET /api/jobs/{id}` 可附带 progress（模型加载、深度估计、物体序号）。三维结果含 `visual_texture`、`collision_meshes`、`reconstruction` 来源信息；这些字段不能经普通编辑接口更换。
+
+## Astra 资产阶段（独立候选）
+
+`POST /api/projects/{id}/actions/asset_refine`，请求 `{"object_ids":["o_…","o_…"]}`。省略 IDs 时处理当前选中的 SAM 3D 资产；空列表拒绝执行。界面“资产优化”可单独勾选目标。
+
+Astra 实际查看参考图、裁剪和原始资产渲染，返回有界参数；当前模板为橡胶锤和红/绿按钮盒，其他类别保留原样。后端生成参数化网格、GLB、纹理和凸碰撞资产，输出同视角/同光照的前后对照。`scene.reports.asset_refinement` 保存候选清单与路径。
+
+**此 action 不修改 active objects，不组装、不落桌、不运行物理、不覆盖已有导出和验证。** 候选采用已有 mesh / visual_texture / collision_meshes / size 格式，并记录归一化中心偏移及原始资产到规范坐标的变换，供后续采纳时正确转换。不能直接仅替换 mesh 路径忽略尺寸/中心。当前按钮不自动采纳候选；“生成场景”的既有流程保持原样。

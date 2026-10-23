@@ -1,0 +1,42 @@
+{
+  "date": "2026-10-23",
+  "project": "8fb4afb273cb4793",
+  "model": "gpt-6-astra",
+  "actual_plan": "jobs/asset_refinement_v1/answer.json",
+  "final_candidates": "jobs/asset_refinement_v2/report.json",
+  "original_objects_sha256": "381e4dc7ea92efdf7bd6f1a159feb2256ef37f0beb7189459e400d402b279d48",
+  "active_objects_unchanged": true,
+  "existing_reports_preserved": true,
+  "scene_assembly_run": false,
+  "physics_run": false,
+  "tests_passed": 19,
+  "assets": [
+    {
+      "id": "o_a7cf06ff0eca",
+      "template": "hammer",
+      "faces_before": 14000,
+      "faces_after": 2560,
+      "closed_components": true
+    },
+    {
+      "id": "o_c887f678eb0f",
+      "template": "button_box",
+      "faces_before": 14000,
+      "faces_after": 1624,
+      "closed_components": true
+    },
+    {
+      "id": "o_542c600bbda4",
+      "template": "button_box",
+      "faces_before": 14000,
+      "faces_after": 1624,
+      "closed_components": true
+    }
+  ],
+  "limitations": [
+    "Only hammer/button-box templates implemented.",
+    "Component assemblies are not Boolean-unioned CAD solids.",
+    "Appearance is simplified; geometry/scale and hidden surfaces remain inferred.",
+    "Candidates are not adopted into the active scene or physically qualified."
+  ]
+}

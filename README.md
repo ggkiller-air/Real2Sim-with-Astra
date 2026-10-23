@@ -13,6 +13,7 @@
 | SAM 3D Objects | ModelScope 主权重；独立 CUDA 环境；真实彩色网格、相机位姿与共同预测深度 |
 | 几何输入 | OBJ / GLB / STL / PLY 导入；显式占位盒预演 |
 | 布局 | 界面自动简化背景为支撑平面；SAM3 桌面掩码 + MoGe 平面拟合；共同相机/尺度，自动支撑面 |
+| 资产优化 | Astra 参考图驱动的锤子/按钮盒参数化候选；同视角前后对照，保留原资产，尚不自动替换场景 |
 | 布局优化 | 真实凸体接触消穿插、重力落稳；Astra 多视角提出位置建议或稳定姿态搜索目标，经渲染与物理复检决定采纳 |
 | MuJoCo | 彩色显示网格与 CoACD 碰撞体分离、质量和摩擦、原生多视角、物理报告、含资产 ZIP |
 | 特殊结构 | 铰链/抽屉/布料/软体标签与备注，当前均按普通刚体处理 |
@@ -63,6 +64,7 @@ Astra 工作流见 [skills/real2sim/SKILL.md](skills/real2sim/SKILL.md)，共享
 - `models.py`, `store.py`：场景记录、来源与持久化。
 - `adapters.py`, `workers/`：独立 SAM3 / SAM 3D 进程。
 - `geometry.py`, `reconstruction.py`：颜色/碰撞处理、共同深度与支撑坐标。
+- `asset_refinement.py`, `prompts/astra_asset_refinement.txt`：独立资产候选、参数约束和前后对照。
 - `review.py`, `pose_search.py`, `prompts/astra_scene_review.txt`：Astra 调用、约束建议和测量验收。
 - `physics.py`：MuJoCo 导出及物理检查。
 - `server.py`, `cli.py`：共享 API、本地服务及查看器。

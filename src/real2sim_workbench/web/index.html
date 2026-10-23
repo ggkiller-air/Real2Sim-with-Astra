@@ -80,7 +80,7 @@
           >
         </div>
         <div class="inline-actions">
-          <button id="showViews" hidden>多视角与 Astra</button><button id="showReport" hidden>检查结果</button
+          <button id="showAssets" hidden>资产优化</button><button id="showViews" hidden>多视角与 Astra</button><button id="showReport" hidden>检查结果</button
           ><a id="download" class="button disabled" hidden>下载 MuJoCo</a
           ><button id="buildScene" class="primary">生成占位场景</button>
         </div>
@@ -99,6 +99,10 @@
         <button id="closeReport">关闭</button>
       </div>
       <div id="report" class="property-body"></div>
+    </dialog>
+    <dialog id="assetDialog" style="max-width:1100px;width:90vw">
+      <div class="dialog-head"><h2>Astra 资产优化</h2><button id="closeAssets">关闭</button></div>
+      <div class="property-body"><p>选择要修整的资产。当前支持锤子、按钮盒；其他物体保留原样。仅生成候选与对照，不改变当前场景。</p><div id="assetChoices" class="inline-actions"></div><button id="runAssets" class="primary">优化所选资产</button><div id="assetReport"></div></div>
     </dialog>
     <dialog id="viewsDialog" style="max-width:1100px;width:90vw">
       <div class="dialog-head"><h2>多视角与 Astra 检查</h2><button id="closeViews">关闭</button></div>

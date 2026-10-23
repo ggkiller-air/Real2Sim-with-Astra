@@ -691,6 +691,7 @@ function renderProperties() {
   };
 }
 function renderReport() {
+  $("showAssets").hidden=!scene?.objects.some(o=>o.selected && o.geometry==="sam3d");
   $("showViews").hidden=!scene?.reports.views || dirty;
   $("download").classList.toggle("disabled", !scene?.reports.export || dirty);
   if (scene?.reports.export)
@@ -800,6 +801,7 @@ function setBusy(value) {
   $("newSelection").disabled = value || !scene;
   $("pointSelection").disabled = value || !scene || !modelStatus.sam3?.configured;
   $("buildScene").disabled = value || !scene?.objects.some((o) => o.selected);
+  $("runAssets").disabled = value;
   $("download").hidden = value || !scene?.reports.export || dirty;
 }
 async function poll(job) {
@@ -957,3 +959,20 @@ $("showViews").onclick=()=>{
   $("viewsDialog").showModal();
 };
 $("closeViews").onclick=()=>$("viewsDialog").close();
+
+function showAssetReport() {
+  const report=scene.reports.asset_refinement;
+  const previous=new Set(report?.objects.map(o=>o.id) || []);
+  const assetName=(o)=>{const recipe=report?.objects.find(x=>x.id===o.id)?.recipe;return recipe?.template==="button_box"?`${recipe.button_color==="red"?"红色":"绿色"}按钮盒`:displayName(o.name);};
+  $("assetChoices").innerHTML=scene.objects.filter(o=>o.selected && o.geometry==="sam3d").map(o=>`<label><input type="checkbox" data-asset-id="${escape(o.id)}" ${!previous.size || previous.has(o.id)?"checked":""}>${escape(assetName(o))}</label>`).join("");
+  $("assetReport").innerHTML=report?`<p><strong>资产候选已生成 · 当前场景保持原样</strong></p><p>每行：参考图 / SAM 3D 原始资产 / Astra 优化候选。前后渲染使用相同视角、光照和显示比例；单图估计尺寸，尚未做新资产的物理验证。</p><img src="${fileURL(report.comparison)}" alt="锤子与按钮盒优化前后对比" style="width:100%;height:49vh;object-fit:contain"><a href="${fileURL(report.comparison)}" target="_blank">打开完整对照图</a><details><summary>Astra 的判断与资产下载</summary>`+report.objects.map(o=>`<p><strong>${escape(assetName(scene.objects.find(x=>x.id===o.id) || {id:o.id,name:o.id}))}</strong>：${escape(o.recipe.assessment)} ${o.status==="kept"?"（保留原样）":`<a href="${fileURL(o.candidate.canonical_glb)}" download>下载 GLB</a>`}</p>`).join("")+"</details>":"";
+}
+$("showAssets").onclick=()=>{showAssetReport();$("assetDialog").showModal();};
+$("closeAssets").onclick=()=>$("assetDialog").close();
+$("runAssets").onclick=async()=>{
+  const ids=[...$("assetChoices").querySelectorAll("input:checked")].map(x=>x.dataset.assetId);
+  if(!ids.length)return notice("请至少选择一个资产。","error");
+  $("assetDialog").close();
+  try {await save();await poll(await api(`/api/projects/${scene.id}/actions/asset_refine`,json("POST",{object_ids:ids})));showAssetReport();$("assetDialog").showModal();}
+  catch(error){notice(error.message,"error");}
+};
