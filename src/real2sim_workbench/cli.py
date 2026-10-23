@@ -21,17 +21,9 @@ def main():
         from .adapters import status
         print(json.dumps(status(), ensure_ascii=False, indent=2))
     elif args.command == "view":
-        import time
-        import mujoco
         import mujoco.viewer
-        model = mujoco.MjModel.from_xml_path(str(args.scene.resolve()))
-        data = mujoco.MjData(model)
-        with mujoco.viewer.launch_passive(model, data) as viewer:
-            while viewer.is_running():
-                start = time.monotonic()
-                mujoco.mj_step(model, data)
-                viewer.sync()
-                time.sleep(max(0, model.opt.timestep-(time.monotonic()-start)))
+        # Use the native viewer's simulation loop and playback controls.
+        mujoco.viewer.launch_from_path(str(args.scene.resolve()))
 
 
 if __name__ == "__main__":
