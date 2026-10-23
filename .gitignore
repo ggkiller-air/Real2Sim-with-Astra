@@ -1,0 +1,30 @@
+# Python and local environments
+__pycache__/
+*.py[cod]
+.venv/
+.venv-*/
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Credentials and machine-specific settings
+.env
+.env.*
+!.env.example
+*.local.toml
+*.local.yaml
+
+# Models, inputs and generated evidence
+/checkpoints/
+/data/
+/outputs/
+/runs/
+/vendor/
+*.log
+.DS_Store
+.local_*

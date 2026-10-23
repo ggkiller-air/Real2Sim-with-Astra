@@ -1,0 +1,37 @@
+{
+  "date": "2026-10-23",
+  "stage": "mujoco_rigid_v0.1",
+  "core_tests_passed": 8,
+  "sam3": {
+    "actual_text_inference": true,
+    "candidate_count": 11,
+    "actual_box_positive_negative_refinement": true,
+    "installed_package": "0.1.4"
+  },
+  "sam3d": {
+    "actual_inference": false,
+    "blocked_by": "official gated weights; host VRAM also below documented requirement"
+  },
+  "ui_checks": [
+    "project selection",
+    "candidate deselection",
+    "special annotation save",
+    "proxy generation",
+    "native physics validation"
+  ],
+  "mujoco_proxy_smoke": {
+    "mujoco_version": "3.17.0",
+    "simulated_seconds": 2.999999999999891,
+    "contact_samples": 1500,
+    "physics_check_pass": true,
+    "initial_max_penetration_m": 0.0,
+    "warnings": []
+  },
+  "qualification": {
+    "image_to_3d_end_to_end": false,
+    "visual_match": false,
+    "real_physical_parameters": false,
+    "articulated_or_soft_objects": false
+  },
+  "local_evidence": "runs/9c32e5d9a3554b9f/ (not committed; includes source image and failed attempts)"
+}
