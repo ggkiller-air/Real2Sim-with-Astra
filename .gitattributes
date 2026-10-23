@@ -1,0 +1,2 @@
+# Preserve original capture bytes (including Windows line endings) for provenance.
+examples/rgbd_tabletop/capture/* -text whitespace=cr-at-eol
