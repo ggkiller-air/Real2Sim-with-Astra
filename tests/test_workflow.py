@@ -190,3 +190,18 @@ def test_auto_segmentation_preserves_removed_objects_and_background(tmp_path,mon
         s=client.get(path).json()['scene']
         assert len(s['objects'])==1 and not s['objects'][0]['selected']
         assert s['reports']['segmentation']['added_count']==0
+
+
+def test_downloaded_weights_do_not_enable_unconfigured_runtime(tmp_path,monkeypatch):
+    import json
+    from real2sim_workbench.adapters import status
+    config=tmp_path/'pipeline.yaml';config.write_text('config')
+    monkeypatch.setenv('R2S_SAM3D_CONFIG',str(config))
+    monkeypatch.delenv('R2S_SAM3D_PYTHON',raising=False)
+    assert not status()['sam3d']['weights_present']
+    weights=tmp_path/'model.ckpt';weights.write_bytes(b'123')
+    (tmp_path/'download_verification.json').write_text(json.dumps({'complete':True,'files':[{'path':'model.ckpt','bytes':3}]}))
+    assert status()['sam3d']['weights_present']
+    assert not status()['sam3d']['configured']
+    weights.write_bytes(b'')
+    assert not status()['sam3d']['weights_present']

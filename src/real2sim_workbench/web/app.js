@@ -896,7 +896,7 @@ async function boot() {
     $("modelStatus").innerHTML = ["sam3", "sam3d"]
       .map(
         (key) =>
-          `<div class="model"><span class="dot ${modelStatus[key].configured ? "ok" : ""}"></span><div>${key === "sam3" ? "SAM3" : "SAM 3D Objects"}<small>${modelStatus[key].configured ? "环境已配置" : key === "sam3d" ? "等待权重权限与运行环境" : "未配置本地模型"}</small></div></div>`,
+          `<div class="model"><span class="dot ${modelStatus[key].configured ? "ok" : ""}"></span><div>${key === "sam3" ? "SAM3" : "SAM 3D Objects"}<small>${modelStatus[key].configured ? "环境已配置" : key === "sam3d" ? (modelStatus[key].weights_present ? "权重已下载，推理环境待配置" : "等待权重与运行环境") : "未配置本地模型"}</small></div></div>`,
       )
       .join("");
     $("buildScene").textContent = modelStatus.sam3d?.configured
