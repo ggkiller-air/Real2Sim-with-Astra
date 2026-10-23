@@ -11,213 +11,114 @@
   </head>
   <body>
     <header>
-      <a class="brand" href="/"
-        >r<span>2</span>s<span class="brand-name"
-          >Real2Sim <small>with Astra</small></span
-        ></a
-      >
-      <div class="header-right">
-        <span class="pill">MuJoCo · 刚体 v0.1</span
-        ><button id="help">使用说明</button>
-      </div>
-    </header>
-    <main>
-      <aside class="sidebar">
-        <div class="eyebrow">WORKSPACE</div>
-        <h1>从图片，<br />到可检查的场景。</h1>
-        <p class="muted">
-          选择物体，建立布局，再让物理检查告诉我们哪里需要调整。
-        </p>
-        <label class="upload primary"
-          >＋ 新建图片项目<input
+      <a class="brand" href="/">r<span>2</span>s <small>with Astra</small></a>
+      <div class="header-actions">
+        <select id="projects" aria-label="最近项目">
+          <option value="">最近项目</option>
+        </select>
+        <label class="button upload"
+          >换张图片<input
             id="upload"
             type="file"
             accept="image/png,image/jpeg,image/webp"
             hidden
         /></label>
-        <label class="field-label" for="projects">最近项目</label
-        ><select id="projects">
-          <option value="">选择项目</option>
-        </select>
-        <div class="divider"></div>
-        <div class="eyebrow">MODEL STATUS</div>
-        <div id="modelStatus"></div>
-        <div class="sidebar-note">
-          第一版不生成铰链、抽屉或软体结构。可以提前标注，当前仍按普通刚体处理。
+        <button id="help" aria-label="使用说明">?</button>
+      </div>
+    </header>
+    <main class="workspace">
+      <div class="title-row">
+        <div>
+          <h1 id="sceneTitle">一张图片，开始搭建</h1>
+          <span class="muted">我们先找出物体，你来做最后选择。</span>
         </div>
-        <div class="sidebar-bottom">
-          本地运行 · 原图与编辑记录保留<br /><a
-            href="https://github.com/ggkiller-air/Real2Sim-with-Astra"
-            target="_blank"
-            rel="noreferrer"
-            >项目仓库 ↗</a
-          >
-        </div>
-      </aside>
-      <section class="workspace">
-        <div class="title-row">
-          <div>
-            <div class="eyebrow">RECONSTRUCTION WORKBENCH</div>
-            <h2 id="sceneTitle">创建你的第一个场景</h2>
+        <span id="saveState" class="muted">自动保存</span>
+      </div>
+      <section class="panel stage">
+        <div class="stage-bar">
+          <div class="tabs">
+            <button id="photoTab" class="active">图片与分割</button
+            ><button id="previewTab">场景预览</button>
           </div>
-          <span id="saveState" class="muted">等待图片</span>
+          <span id="imageSize" class="muted"></span
+          ><button id="cancelAdd" hidden>取消添加</button
+          ><button id="resetView" hidden>重置视角</button>
         </div>
-        <div class="steps">
-          <span><b>01</b> 选择物体</span><span><b>02</b> 设置刚体与布局</span
-          ><span><b>03</b> 物理检查与导出</span>
+        <div class="canvas-wrap" id="imageWrap">
+          <canvas id="imageCanvas" aria-label="原图与物体分割"></canvas>
+          <div id="emptyImage" class="empty">
+            <strong>上传图片，自动找出物体</strong>
+            <p>保留想要的，删除多余的；漏掉的框一下就好。</p>
+            <label class="button primary" for="upload">＋ 选择图片</label>
+          </div>
         </div>
-        <div id="notice" role="status" aria-live="polite">
-          上传一张图片开始。也可以从左侧打开已有项目。
-        </div>
-        <div class="views">
-          <section class="panel image-panel">
-            <div class="panel-head">
-              <h3>参考图片 <small id="imageSize"></small></h3>
-              <button id="clearPrompts">清除提示</button>
-            </div>
-            <div class="tools" role="group" aria-label="图像工具">
-              <button class="active" data-mode="select">选择</button
-              ><button data-mode="box">框选</button
-              ><button data-mode="positive">＋ 正点</button
-              ><button data-mode="negative">− 负点</button
-              ><button data-mode="table">标桌面四角</button>
-            </div>
-            <div class="canvas-wrap" id="imageWrap">
-              <canvas id="imageCanvas" aria-label="原图与物体分割"></canvas>
-              <div id="emptyImage" class="empty">
-                <div class="empty-icon">▧</div>
-                <strong>上传一张桌面或室内照片</strong>
-                <p>自动分割提出候选，你来决定保留哪些物体。</p>
-              </div>
-            </div>
-            <div class="image-actions">
-              <label class="field-label" for="labels"
-                >自动候选 · 英文描述，用逗号分隔</label
-              >
-              <div class="input-row">
-                <input
-                  id="labels"
-                  value="cup, bowl, tray, spoon"
-                  placeholder="cup, bowl, tray"
-                /><button id="segmentText" class="primary">自动分割</button>
-              </div>
-              <div class="input-row">
-                <span class="muted" id="promptHint"
-                  >框选后可分割，或只保存人工区域。</span
-                ><button id="manualRegion">仅保存框选</button
-                ><button id="segmentInstance">分割 / 修正选中物体</button>
-              </div>
-            </div>
-          </section>
-          <section class="panel">
-            <div class="panel-head">
-              <h3>三维布局 <small>拖动旋转 · 滚轮缩放</small></h3>
-              <button id="resetView">重置视角</button>
-            </div>
-            <div id="viewport"><div class="view-label">Z 向上 · 米</div></div>
-            <div class="preview-note" id="geometryNote">
-              布局预览。占位盒不代表照片重建；网格在 MuJoCo 中使用凸包碰撞。
-            </div>
-            <div class="toolbar">
-              <button id="reconstruct" class="primary">SAM 3D 重建</button
-              ><button data-action="proxy">生成占位预演</button
-              ><button data-action="initialize">按图片初始化</button
-              ><button data-action="optimize">优化布局</button>
-            </div>
-          </section>
-        </div>
-        <div class="details">
-          <section class="panel objects-panel">
-            <div class="panel-head">
-              <h3>物体清单 <small id="objectCount">0 个</small></h3>
-              <button id="newSelection">＋ 新物体提示</button>
-            </div>
-            <div id="objects">
-              <div class="empty compact">
-                运行分割后，在这里勾选需要的物体。
-              </div>
-            </div>
-          </section>
-          <section class="panel property-panel">
-            <div class="panel-head">
-              <h3>选中物体</h3>
-              <button id="save" class="primary">保存修改</button>
-            </div>
-            <div id="properties" class="property-body">
-              <p class="muted">选择一个物体，设置尺寸、支撑物和类型标注。</p>
-            </div>
-          </section>
-          <section class="panel check-panel">
-            <div class="panel-head"><h3>桌面与检查</h3></div>
-            <div class="property-body">
-              <div class="two-col">
-                <label
-                  >桌宽 / m<input
-                    id="tableWidth"
-                    type="number"
-                    min="0.05"
-                    max="10"
-                    step="0.01"
-                    value="1.2" /></label
-                ><label
-                  >桌深 / m<input
-                    id="tableDepth"
-                    type="number"
-                    min="0.05"
-                    max="10"
-                    step="0.01"
-                    value="0.8"
-                /></label>
-              </div>
-              <p class="muted" id="calibrationStatus">
-                未标定：使用整幅图片近似映射到桌面。
-              </p>
-              <label
-                >检查时长 / 秒<input
-                  id="seconds"
-                  type="number"
-                  min="0.1"
-                  max="30"
-                  step="0.5"
-                  value="3"
-              /></label>
-              <div class="toolbar">
-                <button data-action="validate" class="primary">
-                  运行物理检查</button
-                ><button data-action="export">导出 MuJoCo</button
-                ><a id="download" class="button disabled">下载场景 ZIP</a>
-              </div>
-              <div id="report">
-                <p class="muted">尚无检查结果。视觉匹配需要独立对照。</p>
-              </div>
-            </div>
-          </section>
+        <div id="viewport" hidden></div>
+        <div class="stage-bottom">
+          <span id="notice" role="status" aria-live="polite"
+            >上传后自动识别，无需填写物体名称。</span
+          ><span id="geometryNote" hidden></span>
         </div>
       </section>
+      <section class="selection">
+        <div class="section-head">
+          <h2>保留的物体 <small id="objectCount">0 个</small></h2>
+          <div class="inline-actions">
+            <button id="undoRemove" hidden>撤回删除</button
+            ><button id="autoDetect">自动补全</button
+            ><button id="newSelection">＋ 框选添加</button>
+          </div>
+        </div>
+        <div id="objects" class="object-grid">
+          <div class="empty-list">识别到的物体会出现在这里。</div>
+        </div>
+      </section>
+      <footer class="action-bar">
+        <div>
+          <span class="background-badge">自动背景 · 排除机械臂</span
+          ><small id="buildHint"
+            >保留支撑平面，忽略远处设备。尺寸为估计值。</small
+          >
+        </div>
+        <div class="inline-actions">
+          <button id="showReport" hidden>检查结果</button
+          ><a id="download" class="button disabled" hidden>下载 MuJoCo</a
+          ><button id="buildScene" class="primary">生成占位场景</button>
+        </div>
+      </footer>
     </main>
+    <dialog id="propertyDialog">
+      <div class="dialog-head">
+        <h2>物体详情</h2>
+        <button id="closeProperties">完成</button>
+      </div>
+      <div id="properties" class="property-body"></div>
+    </dialog>
+    <dialog id="reportDialog">
+      <div class="dialog-head">
+        <h2>物理检查</h2>
+        <button id="closeReport">关闭</button>
+      </div>
+      <div id="report" class="property-body"></div>
+    </dialog>
     <dialog id="helpDialog">
-      <h2>第一版怎样使用</h2>
-      <ol>
-        <li>
-          上传图片，输入类别自动分割，或框选并添加正负点。先点击“新物体提示”可避免覆盖已有掩码。
-        </li>
-        <li>勾选需要的实例。特殊类型只保存标注，不改变刚体模型。</li>
-        <li>
+      <div class="dialog-head">
+        <h2>只需要做一点选择</h2>
+        <button id="closeHelp">关闭</button>
+      </div>
+      <div class="property-body">
+        <p>
+          上传后，SAM3
+          自动寻找常见桌面物体并合并重复分割。删除不需要的物体，或用框选补充遗漏；类型和重量在物体卡片上选择，修改自动保存。
+        </p>
+        <p>
+          生成时自动建立支撑平面、安排布局、减少穿插并运行短时物理检查。背景使用简化桌面与地面；单张照片的尺寸和接触位置仍是估计，不能保证覆盖所有物体或还原遮挡关系。
+        </p>
+        <p>
           SAM 3D
-          需要独立环境和权重权限。暂未具备时，可导入已有网格，或明确选择“占位预演”测试流水线。
-        </li>
-        <li>
-          按远左、远右、近右、近左顺序标桌面四角，填写桌面尺寸。初始布局采用框底部投影近似，不是深度重建。
-        </li>
-        <li>
-          调整尺寸、位置与支撑关系，保存后运行优化。优化使用保守包围盒搜索，需要人工复核。
-        </li>
-        <li>运行物理检查并导出。下载的 ZIP 解压后用 MuJoCo 加载 scene.xml。</li>
-      </ol>
-      <p>
-        凸包会填平网格凹洞。当前不支持容器内部放置、关节运动和软体变形。模型输出、手动参数和检查结果都保留来源。
-      </p>
-      <button id="closeHelp" class="primary">知道了</button>
+          权重尚未就绪时，按钮会明确生成占位盒；可以在物体详情中导入已有模型。特殊类型目前只保存标注，仍作为普通刚体处理。
+        </p>
+        <div id="modelStatus"></div>
+      </div>
     </dialog>
     <script type="module" src="/static/app.js"></script>
   </body>

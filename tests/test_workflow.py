@@ -152,3 +152,41 @@ def test_manual_region_without_models(tmp_path):
         job=client.post(path+'/actions/validate',json={'seconds':1}).json()
         assert wait(client,job)['state']=='done'
         assert client.get(path).json()['scene']['reports']['validation']['physics_check_pass']
+
+
+def test_candidate_dedup_and_robot_exclusion(tmp_path):
+    from real2sim_workbench.segmentation import clean_candidates
+    masks=[]
+    for name,rect in [('cup',(10,10,25,25)),('tool',(10,10,25,25)),('arm',(40,10,70,50))]:
+        mask=np.zeros((100,100),dtype=np.uint8); x,y,x2,y2=rect;mask[y:y2,x:x2]=255
+        Image.fromarray(mask).save(tmp_path/f'{name}.png')
+        masks.append({'name':name,'mask':f'{name}.png','score':.9})
+    exclusion=np.zeros((100,100),dtype=bool);exclusion[10:50,40:70]=True
+    assert [r['name'] for r in clean_candidates(masks,tmp_path,exclusion)]==['cup']
+
+
+def test_auto_segmentation_preserves_removed_objects_and_background(tmp_path,monkeypatch):
+    from real2sim_workbench import adapters
+    monkeypatch.setattr(adapters,'status',lambda:{'sam3':{'configured':True}})
+    def worker(kind,request,folder):
+        assert request['mode']=='auto'
+        assert 'hammer' in request['labels']
+        mask=np.zeros((480,640),dtype=np.uint8);mask[300:340,200:240]=255
+        Image.fromarray(mask).save(folder/'object.png')
+        Image.fromarray(np.zeros_like(mask)).save(folder/'robot.png')
+        return {'objects':[{'name':'hammer','mask':'object.png','score':.9,'bbox':[200,300,240,340]}],
+                'background':{'exclusion_mask':'robot.png','table_bbox':[0,250,640,480]}}
+    monkeypatch.setattr(adapters,'run_worker',worker)
+    with TestClient(create_app(tmp_path/'runs')) as client:
+        s=client.post('/api/projects',files={'file':('photo.png',image_bytes())}).json()
+        path='/api/projects/'+s['id']
+        assert wait(client,client.post(path+'/segment',json={'mode':'auto'}).json())['state']=='done'
+        s=client.get(path).json()['scene'];assert len(s['objects'])==1
+        assert s['table']['calibration_source']=='assumed'
+        assert s['preprocessing']['exclude_labels']==['robot arm','robot gripper']
+        s['objects'][0]['selected']=False
+        assert client.put(path,json=s).status_code==200
+        assert wait(client,client.post(path+'/segment',json={'mode':'auto'}).json())['state']=='done'
+        s=client.get(path).json()['scene']
+        assert len(s['objects'])==1 and not s['objects'][0]['selected']
+        assert s['reports']['segmentation']['added_count']==0

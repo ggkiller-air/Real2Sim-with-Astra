@@ -23,7 +23,10 @@ let scene = null,
 let reference = null,
   masks = new Map(),
   modelStatus = {},
-  previewGeneration = 0;
+  previewGeneration = 0,
+  removed = [],
+  thumbnails = new Map(),
+  building = false;
 const colors = [
   "#d9754e",
   "#3d9b81",
@@ -114,6 +117,7 @@ resetCamera();
 if (renderer) {
   new ResizeObserver(() => {
     const p = $("viewport");
+    if (!p.clientWidth || !p.clientHeight) return;
     renderer.setSize(p.clientWidth, p.clientHeight);
     camera.aspect = p.clientWidth / p.clientHeight;
     camera.updateProjectionMatrix();
@@ -206,6 +210,7 @@ function draw() {
   ctx.drawImage(reference, 0, 0);
   scene.objects.forEach((obj, index) => {
     const mask = masks.get(obj.id);
+    if (!obj.selected) return;
     if (mask) {
       ctx.globalAlpha = obj.selected
         ? obj.id === selected
@@ -242,7 +247,7 @@ function draw() {
     ctx.lineWidth = 2;
     ctx.stroke();
   }
-  const corners = tablePoints.length ? tablePoints : scene.table.corners;
+  const corners = [];
   if (corners.length) {
     ctx.strokeStyle = "#f5d15c";
     ctx.lineWidth = 3;
@@ -351,7 +356,11 @@ canvas.addEventListener("pointerdown", (event) => {
   } else {
     const candidates = scene.objects.filter(
       (o) =>
-        x >= o.bbox[0] && x <= o.bbox[2] && y >= o.bbox[1] && y <= o.bbox[3],
+        o.selected &&
+        x >= o.bbox[0] &&
+        x <= o.bbox[2] &&
+        y >= o.bbox[1] &&
+        y <= o.bbox[3],
     );
     candidates.sort(
       (a, b) =>
@@ -373,39 +382,71 @@ canvas.addEventListener("pointermove", (event) => {
     draw();
   }
 });
-canvas.addEventListener("pointerup", () => {
+canvas.addEventListener("pointerup", async () => {
+  const adding = !!start;
   start = null;
+  if (adding && box && box[2] - box[0] > 4 && box[3] - box[1] > 4)
+    await addRegion();
 });
 function setMode(next) {
   mode = next;
-  document
-    .querySelectorAll("[data-mode]")
-    .forEach((b) => b.classList.toggle("active", b.dataset.mode === mode));
-  if (mode === "table") {
-    tablePoints = [];
-    notice("依次点击桌面的：远左 → 远右 → 近右 → 近左。");
-  } else if (mode === "box")
-    notice("拖动框选目标。当前选中物体会被修正；点击“新物体提示”可新增实例。");
+  canvas.classList.toggle("adding", mode === "box");
+  $("cancelAdd").hidden = mode !== "box";
 }
-document
-  .querySelectorAll("[data-mode]")
-  .forEach((b) => (b.onclick = () => setMode(b.dataset.mode)));
-$("clearPrompts").onclick = () => {
+$("cancelAdd").onclick = () => {
   box = null;
-  points = [];
-  tablePoints = [];
+  setMode("select");
   draw();
+  notice("已取消添加。");
 };
 $("newSelection").onclick = () => {
+  if (!scene || busy) return;
   selected = null;
   box = null;
   points = [];
-  renderObjects();
-  renderProperties();
-  draw();
+  showView(false);
   setMode("box");
-  notice("新物体模式：框选后点击“分割 / 修正选中物体”。");
+  draw();
+  notice("在图片上框住遗漏的物体，松开后自动添加。");
 };
+async function addRegion() {
+  const chosenBox = [...box];
+  setMode("select");
+  setBusy(true);
+  try {
+    await save();
+    if (modelStatus.sam3?.configured) {
+      await poll(
+        await api(
+          `/api/projects/${scene.id}/segment`,
+          json("POST", {
+            mode: "instance",
+            box: chosenBox,
+            label: "添加的物体",
+          }),
+        ),
+      );
+    } else {
+      scene = await api(
+        `/api/projects/${scene.id}/region`,
+        json("POST", { box: chosenBox, label: "框选物体" }),
+      );
+      dirty = false;
+      render();
+      notice("已保存框选区域；本机 SAM3 尚未就绪。");
+    }
+    if (scene.reports.segmentation?.added_count === 0)
+      notice("没有新增物体：目标可能已存在，或属于排除的机械臂区域。");
+    selected = scene.objects.filter((o) => o.selected).at(-1)?.id;
+    box = null;
+    draw();
+    renderObjects();
+  } catch (error) {
+    notice(error.message, "error");
+  } finally {
+    setBusy(false);
+  }
+}
 
 function select(id) {
   selected = id;
@@ -416,94 +457,191 @@ function select(id) {
   draw();
   rebuild3D();
 }
+const displayName = (name) =>
+  ({
+    "small object on the table": "桌面物体",
+    "button box": "按钮盒",
+    box: "盒子",
+    tool: "工具",
+    "paper cup": "纸杯",
+    cup: "杯子",
+    bowl: "碗",
+    tray: "托盘",
+    spoon: "勺子",
+    bottle: "瓶子",
+    jar: "罐子",
+    glass: "玻璃杯",
+    bag: "袋子",
+    hammer: "锤子",
+    brush: "刷子",
+    fruit: "水果",
+    button: "按钮",
+    block: "方块",
+    object: "物体",
+    "push button": "按钮",
+    "tea bag": "茶包",
+    tongs: "夹子",
+    "utensil rack": "器具架",
+  })[name] || name;
+function thumbnail(obj) {
+  const key = `${scene.id}/${obj.id}/${obj.bbox.join()}`;
+  if (thumbnails.has(key)) return thumbnails.get(key);
+  if (!reference) return "";
+  const c = document.createElement("canvas");
+  c.width = 100;
+  c.height = 80;
+  const [x, y, x2, y2] = obj.bbox;
+  const scale = Math.min(96 / (x2 - x), 76 / (y2 - y));
+  c.getContext("2d").drawImage(
+    reference,
+    x,
+    y,
+    x2 - x,
+    y2 - y,
+    (100 - (x2 - x) * scale) / 2,
+    (80 - (y2 - y) * scale) / 2,
+    (x2 - x) * scale,
+    (y2 - y) * scale,
+  );
+  const url = c.toDataURL();
+  thumbnails.set(key, url);
+  return url;
+}
+async function persist() {
+  setBusy(true);
+  try {
+    await save();
+  } catch (error) {
+    notice(error.message, "error");
+  } finally {
+    setBusy(false);
+  }
+}
 function renderObjects() {
-  $("objectCount").textContent =
-    `${scene.objects.filter((o) => o.selected).length} / ${scene.objects.length} 已选`;
-  $("objects").innerHTML = scene.objects.length
-    ? scene.objects
+  const objects = scene.objects.filter((o) => o.selected);
+  $("objectCount").textContent = `${objects.length} 个`;
+  $("undoRemove").hidden = !removed.length;
+  $("objects").innerHTML = objects.length
+    ? objects
+        .map((obj) => {
+          const weights = [...new Set([0.02, 0.1, 0.5, 1, obj.mass])].sort(
+            (a, b) => a - b,
+          );
+          return `<article class="object-card ${obj.id === selected ? "active" : ""}" data-id="${obj.id}">
+      <img class="thumb" src="${thumbnail(obj)}" alt="${escape(displayName(obj.name))}">
+      <div class="object-main"><div class="object-title"><button class="object-name" title="查看物体详情">${escape(displayName(obj.name))}</button><button class="remove-object" aria-label="删除 ${escape(displayName(obj.name))}">×</button></div>
+      <div class="card-options"><select class="object-type" aria-label="${escape(displayName(obj.name))} 类型">${Object.entries(
+        annotationLabels,
+      )
         .map(
-          (obj, i) =>
-            `<div class="object ${obj.id === selected ? "active" : ""}" data-id="${obj.id}"><input type="checkbox" aria-label="保留 ${escape(obj.name)}" ${obj.selected ? "checked" : ""}><span class="swatch" style="background:${colors[i % colors.length]}"></span><div class="object-info"><div class="object-name">${escape(obj.name)}</div><div class="object-sub">${geometryLabels[obj.geometry]} · ${annotationLabels[obj.annotation]}</div></div><span class="object-id">${obj.score == null ? "" : (obj.score * 100).toFixed(0) + "%"}</span></div>`,
+          ([key, value]) =>
+            `<option value="${key}" ${obj.annotation === key ? "selected" : ""}>${value.replace("（仅标注）", " · 标注")}</option>`,
         )
+        .join(
+          "",
+        )}</select><select class="object-mass" aria-label="${escape(displayName(obj.name))} 重量">${weights.map((w) => `<option value="${w}" ${obj.mass === w ? "selected" : ""}>${w * 1000} 克${obj.parameter_source === "assumed" && obj.mass === w ? "（估）" : ""}</option>`).join("")}</select></div></div></article>`;
+        })
         .join("")
-    : '<div class="empty compact">暂无候选，请运行分割。</div>';
-  document.querySelectorAll(".object").forEach((row) => {
-    row.onclick = (e) => {
-      if (e.target.type === "checkbox") {
-        scene.objects.find((o) => o.id === row.dataset.id).selected =
-          e.target.checked;
+    : '<div class="empty-list">没有保留的物体。可以自动补全，或框选添加。</div>';
+  $("objects")
+    .querySelectorAll(".object-card")
+    .forEach((card) => {
+      const obj = scene.objects.find((o) => o.id === card.dataset.id);
+      card.querySelector(".thumb").onclick = () => {
+        if (!busy) {
+          select(obj.id);
+          showView(false);
+        }
+      };
+      card.querySelector(".object-name").onclick = () => {
+        if (!busy) {
+          select(obj.id);
+          $("propertyDialog").showModal();
+        }
+      };
+      card.querySelector(".remove-object").onclick = async () => {
+        if (busy) return;
+        const affected = scene.objects
+          .filter((o) => o.support === obj.id)
+          .map((o) => [o.id, o.support]);
+        affected.forEach(
+          ([id]) => (scene.objects.find((o) => o.id === id).support = "table"),
+        );
+        obj.selected = false;
+        removed.push({ id: obj.id, affected });
+        if (selected === obj.id) selected = null;
         change();
         draw();
+        renderObjects();
         rebuild3D();
-        $("objectCount").textContent =
-          `${scene.objects.filter((o) => o.selected).length} / ${scene.objects.length} 已选`;
-      } else select(row.dataset.id);
-    };
-  });
+        await persist();
+      };
+      card.querySelector(".object-type").onchange = async (e) => {
+        obj.annotation = e.target.value;
+        change();
+        await persist();
+      };
+      card.querySelector(".object-mass").onchange = async (e) => {
+        obj.mass = Number(e.target.value);
+        obj.parameter_source = "user";
+        change();
+        await persist();
+      };
+    });
 }
+$("undoRemove").onclick = async () => {
+  const entry = removed.pop();
+  if (!entry || busy) return;
+  const obj = scene.objects.find((o) => o.id === entry.id);
+  obj.selected = true;
+  entry.affected.forEach(([id, support]) => {
+    const child = scene.objects.find((o) => o.id === id);
+    if (child) child.support = support;
+  });
+  if (
+    obj.support !== "table" &&
+    !scene.objects.find((o) => o.id === obj.support)?.selected
+  )
+    obj.support = "table";
+  change();
+  renderObjects();
+  draw();
+  rebuild3D();
+  await persist();
+};
 function renderProperties() {
   const obj = current();
   if (!obj) {
-    $("properties").innerHTML =
-      '<p class="muted">选择一个物体，设置尺寸、支撑物和类型标注。</p>';
+    $("properties").innerHTML = "选择一个物体查看详情。";
     return;
   }
   const input = (label, key, value, extra = "") =>
     `<label>${label}<input data-key="${key}" value="${escape(value)}" ${extra}></label>`;
   $("properties").innerHTML =
     input("名称", "name", obj.name) +
-    `<div class="two-col"><label>类型标注<select data-key="annotation">${Object.entries(
-      annotationLabels,
-    )
-      .map(
-        ([key, value]) =>
-          `<option value="${key}" ${key === obj.annotation ? "selected" : ""}>${value}</option>`,
-      )
-      .join(
-        "",
-      )}</select></label><label>支撑物<select data-key="support"><option value="table">桌面</option>${scene.objects
-      .filter((o) => o.id !== obj.id)
-      .map(
-        (o) =>
-          `<option value="${o.id}" ${o.id === obj.support ? "selected" : ""}>${escape(o.name)}</option>`,
-      )
-      .join(
-        "",
-      )}</select></label></div><div class="three-col">${["宽 X / m", "深 Y / m", "高 Z / m"].map((name, i) => input(name, `size.${i}`, obj.size[i].toFixed(4), 'type="number" step="0.01" min="0.001" max="10"')).join("")}</div><div class="three-col">${["位置 X", "位置 Y", "位置 Z"].map((name, i) => input(name, `position.${i}`, obj.position[i].toFixed(4), 'type="number" step="0.01"')).join("")}</div><div class="three-col">${input("朝向 / 度", "yaw", (obj.yaw * 180) / Math.PI, 'type="number" step="5"')}${input("质量 / kg", "mass", obj.mass, 'type="number" step="0.01" min="0.001"')}${input("滑动摩擦", "friction", obj.friction, 'type="number" step="0.05" min="0" max="3"')}</div><label>参数来源<select data-key="parameter_source">${Object.entries(
-      { assumed: "估计先验", user: "用户设定", measured: "实际测量" },
-    )
-      .map(
-        ([key, value]) =>
-          `<option value="${key}" ${key === obj.parameter_source ? "selected" : ""}>${value}</option>`,
-      )
-      .join(
-        "",
-      )}</select></label><label class="inline-check"><input type="checkbox" data-key="locked" ${obj.locked ? "checked" : ""}>锁定布局编辑（仿真中仍可运动）</label><label>备注<textarea data-key="notes" rows="2">${escape(obj.notes)}</textarea></label><label class="upload mesh-upload">导入此物体的网格<input id="meshFile" type="file" accept=".obj,.glb,.stl,.ply" hidden></label><p class="smallnote">导入后按当前宽度缩放，请核对尺寸。碰撞使用凸包；特殊结构只保存标注。</p>`;
+    `<div class="three-col">${["宽 / m", "深 / m", "高 / m"].map((label, i) => input(label, `size.${i}`, obj.size[i], 'type="number" min="0.001" max="10" step="0.01"')).join("")}</div>` +
+    `<div class="two-col">${input("质量 / kg", "mass", obj.mass, 'type="number" min="0.001" step="0.01"')}${input("摩擦系数", "friction", obj.friction, 'type="number" min="0" max="3" step="0.05"')}</div>` +
+    `<label class="button upload">导入已有模型<input id="meshFile" type="file" accept=".obj,.glb,.stl,.ply" hidden></label><p class="smallnote">${geometryLabels[obj.geometry]} · 默认尺寸与重量为估计值。特殊类型仅标注，当前按普通刚体处理。</p>`;
   $("properties")
     .querySelectorAll("[data-key]")
     .forEach(
       (field) =>
-        (field.onchange = () => {
-          const key = field.dataset.key;
-          let value =
-            field.type === "checkbox"
-              ? field.checked
-              : field.type === "number"
-                ? Number(field.value)
-                : field.value;
-          if (typeof value === "number" && !Number.isFinite(value)) return;
+        (field.onchange = async () => {
+          const key = field.dataset.key,
+            value = field.type === "number" ? Number(field.value) : field.value;
           if (key.includes(".")) {
-            const [base, index] = key.split(".");
-            obj[base][Number(index)] = value;
-          } else obj[key] = key === "yaw" ? (value * Math.PI) / 180 : value;
+            const [base, i] = key.split(".");
+            obj[base][+i] = value;
+          } else obj[key] = value;
+          if (key !== "name") obj.parameter_source = "user";
           change();
-          renderObjects();
-          rebuild3D();
+          await persist();
         }),
     );
-  $("meshFile").onchange = async (event) => {
-    const file = event.target.files[0];
+  $("meshFile").onchange = async (e) => {
+    const file = e.target.files[0];
     if (!file) return;
+    setBusy(true);
     try {
       await save();
       const form = new FormData();
@@ -513,21 +651,20 @@ function renderProperties() {
         body: form,
       });
       render();
-      notice("网格已导入。请核对单位、尺寸与朝向。");
+      notice("模型已导入。");
     } catch (error) {
       notice(error.message, "error");
+    } finally {
+      setBusy(false);
     }
   };
-}
-function renderCalibration() {
-  $("calibrationStatus").textContent = scene.table.corners.length
-    ? "已有四角标注；尺寸由用户指定。框底部仍是接触位置近似。"
-    : "未标定：使用整幅图片近似映射到桌面。";
 }
 function renderReport() {
   $("download").classList.toggle("disabled", !scene?.reports.export || dirty);
   if (scene?.reports.export)
     $("download").href = `/api/projects/${scene.id}/download`;
+  $("download").hidden = !scene?.reports.export || dirty;
+  $("showReport").hidden = !scene?.reports.validation || dirty;
   const report = scene?.reports.validation;
   if (dirty) {
     $("report").innerHTML =
@@ -545,26 +682,14 @@ function render() {
   $("sceneTitle").textContent = scene.name;
   $("saveState").textContent = `已保存 · 修订 ${scene.revision}`;
   $("imageSize").textContent = `${scene.image_size.join(" × ")}`;
-  $("tableWidth").value = scene.table.width;
-  $("tableDepth").value = scene.table.depth;
-  renderCalibration();
+
   renderObjects();
   renderProperties();
   renderReport();
   rebuild3D();
   draw();
+  setBusy(busy);
 }
-for (const [id, key] of [
-  ["tableWidth", "width"],
-  ["tableDepth", "depth"],
-])
-  $(id).onchange = () => {
-    if (!scene) return;
-    scene.table[key] = Number($(id).value);
-    scene.table.calibration_source = "user";
-    change();
-    rebuild3D();
-  };
 async function save() {
   if (!scene) throw new Error("请先上传图片");
   if (!dirty) return;
@@ -572,10 +697,6 @@ async function save() {
   dirty = false;
   render();
 }
-$("save").onclick = () =>
-  save()
-    .then(() => notice("修改已保存。"))
-    .catch((error) => notice(error.message, "error"));
 async function refreshProjects() {
   const list = await api("/api/projects");
   $("projects").innerHTML =
@@ -590,6 +711,9 @@ async function refreshProjects() {
 }
 async function openProject(id) {
   const result = await api(`/api/projects/${id}`);
+  reference = null;
+  thumbnails.clear();
+  removed = [];
   scene = result.scene;
   dirty = false;
   selected = scene.objects[0]?.id || null;
@@ -599,8 +723,11 @@ async function openProject(id) {
   localStorage.setItem("r2s-project", id);
   render();
   await loadImages();
+  renderObjects();
   resetCamera();
-  if (result.job) poll(result.job);
+  notice("点击物体可查看详情；删除多余物体，框选补充遗漏。");
+  if (result.job) await poll(result.job);
+  setBusy(false);
 }
 $("projects").onchange = async () => {
   try {
@@ -623,7 +750,7 @@ $("upload").onchange = async (event) => {
     const created = await api("/api/projects", { method: "POST", body: data });
     await openProject(created.id);
     await refreshProjects();
-    notice("图片已保存。开始自动分割，或框选你需要的物体。");
+    await autoDetect();
   } catch (error) {
     notice(error.message, "error");
   } finally {
@@ -634,16 +761,24 @@ function setBusy(value) {
   busy = value;
   document
     .querySelectorAll(
-      ".workspace button,.workspace input,.workspace select,.workspace textarea,#projects,#upload",
+      ".workspace button,.workspace select,.workspace input,#properties input,#properties select,#projects,#upload",
     )
     .forEach((el) => (el.disabled = value));
-  $("reconstruct").disabled = value || !modelStatus.sam3d?.configured;
-  $("segmentText").disabled = value || !modelStatus.sam3?.configured;
-  $("segmentInstance").disabled = value || !modelStatus.sam3?.configured;
+  $("autoDetect").disabled = value || !scene || !modelStatus.sam3?.configured;
+  $("newSelection").disabled = value || !scene;
+  $("buildScene").disabled = value || !scene?.objects.some((o) => o.selected);
 }
 async function poll(job) {
   setBusy(true);
-  notice(`正在执行 ${job.kind}，结果和日志会保存在当前项目。`, "busy");
+  const jobNames = {
+    segment: "正在识别物体",
+    proxy: "正在准备占位几何",
+    initialize: "正在安排物体位置",
+    optimize: "正在减少物体穿插",
+    validate: "正在检查物理稳定性",
+    reconstruct: "正在生成三维资产",
+  };
+  notice(jobNames[job.kind] || "正在处理", "busy");
   try {
     while (job.state === "queued" || job.state === "running") {
       await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -655,102 +790,100 @@ async function poll(job) {
     dirty = false;
     render();
     await loadImages();
+    renderObjects();
     await refreshProjects();
     const detail =
       job.kind === "segment"
-        ? `找到 ${scene.reports.segmentation?.candidate_count || 0} 个候选。请检查掩码并选择需要的实例。`
+        ? `新增 ${scene.reports.segmentation?.added_count || 0} 个物体；检测到的机械臂已排除。可删除多余项或框选补充。`
         : job.kind === "proxy"
           ? "占位预演已生成。这些盒子不是照片重建资产。"
           : job.kind === "validate"
             ? scene.reports.validation.physics_check_pass
               ? "短时物理检查通过；仍需视觉对照。"
-              : "检查发现问题，请查看右侧逐物体结果。"
+              : "检查发现问题，点击“检查结果”查看详情。"
             : "操作完成，结果已保存。";
     notice(detail);
+  } catch (error) {
+    notice(error.message, "error");
+    throw error;
+  } finally {
+    setBusy(building);
+  }
+}
+async function autoDetect() {
+  if (!scene) return;
+  if (!modelStatus.sam3?.configured) {
+    notice("本机 SAM3 尚未就绪，可以先框选添加。", "error");
+    return;
+  }
+  setBusy(true);
+  try {
+    await save();
+    await poll(
+      await api(
+        `/api/projects/${scene.id}/segment`,
+        json("POST", { mode: "auto" }),
+      ),
+    );
   } catch (error) {
     notice(error.message, "error");
   } finally {
     setBusy(false);
   }
 }
-async function submitAction(action) {
+$("autoDetect").onclick = autoDetect;
+$("buildScene").onclick = async () => {
+  building = true;
+  setBusy(true);
   try {
     await save();
-    const job = await api(
-      `/api/projects/${scene.id}/actions/${action}`,
-      json("POST", { seconds: Number($("seconds").value) }),
+    const hasMissing = scene.objects.some(
+      (o) => o.selected && o.geometry === "none",
     );
-    await poll(job);
+    const actions = hasMissing
+      ? [
+          modelStatus.sam3d?.configured ? "reconstruct" : "proxy",
+          "initialize",
+          "optimize",
+          "validate",
+        ]
+      : ["initialize", "optimize", "validate"];
+    for (const action of actions)
+      await poll(
+        await api(
+          `/api/projects/${scene.id}/actions/${action}`,
+          json("POST", { seconds: 3 }),
+        ),
+      );
+    showView(true);
+    notice(
+      scene.reports.validation.physics_check_pass
+        ? "场景已生成，短时物理检查通过。可以下载 MuJoCo 场景。"
+        : "场景已生成，但物理检查发现问题，请查看检查结果。",
+      scene.reports.validation.physics_check_pass ? "" : "error",
+    );
   } catch (error) {
     notice(error.message, "error");
+  } finally {
+    building = false;
+    setBusy(false);
   }
+};
+function showView(preview) {
+  $("imageWrap").hidden = preview;
+  $("viewport").hidden = !preview;
+  $("resetView").hidden = !preview;
+  $("photoTab").classList.toggle("active", !preview);
+  $("previewTab").classList.toggle("active", preview);
 }
-document
-  .querySelectorAll("[data-action]")
-  .forEach(
-    (button) => (button.onclick = () => submitAction(button.dataset.action)),
-  );
-$("reconstruct").onclick = () => submitAction("reconstruct");
-$("segmentText").onclick = async () => {
-  try {
-    await save();
-    const labels = $("labels")
-      .value.split(/[,，]/)
-      .map((v) => v.trim())
-      .filter(Boolean);
-    await poll(
-      await api(
-        `/api/projects/${scene.id}/segment`,
-        json("POST", { mode: "text", labels }),
-      ),
-    );
-  } catch (error) {
-    notice(error.message, "error");
-  }
-};
-$("segmentInstance").onclick = async () => {
-  try {
-    await save();
-    await poll(
-      await api(
-        `/api/projects/${scene.id}/segment`,
-        json("POST", {
-          mode: "instance",
-          box: box || current()?.bbox || null,
-          points,
-          object_id: selected,
-          label: "选中物体",
-        }),
-      ),
-    );
-    box = null;
-    points = [];
-    draw();
-  } catch (error) {
-    notice(error.message, "error");
-  }
-};
-$("manualRegion").onclick = async () => {
-  try {
-    await save();
-    if (!box) throw new Error("请先框选一个区域");
-    scene = await api(
-      `/api/projects/${scene.id}/region`,
-      json("POST", { box, label: "人工框选物体" }),
-    );
-    selected = scene.objects.at(-1).id;
-    box = null;
-    points = [];
-    dirty = false;
-    render();
-    notice("已保存人工区域，没有运行分割模型。可以导入网格或生成占位预演。");
-  } catch (error) {
-    notice(error.message, "error");
-  }
-};
+$("photoTab").onclick = () => showView(false);
+$("previewTab").onclick = () => showView(true);
 $("resetView").onclick = resetCamera;
 $("help").onclick = () => $("helpDialog").showModal();
 $("closeHelp").onclick = () => $("helpDialog").close();
+$("closeProperties").onclick = () => $("propertyDialog").close();
+$("showReport").onclick = () => $("reportDialog").showModal();
+$("closeReport").onclick = () => $("reportDialog").close();
 window.addEventListener("beforeunload", (event) => {
   if (dirty) {
     event.preventDefault();
@@ -766,7 +899,9 @@ async function boot() {
           `<div class="model"><span class="dot ${modelStatus[key].configured ? "ok" : ""}"></span><div>${key === "sam3" ? "SAM3" : "SAM 3D Objects"}<small>${modelStatus[key].configured ? "环境已配置" : key === "sam3d" ? "等待权重权限与运行环境" : "未配置本地模型"}</small></div></div>`,
       )
       .join("");
-    setBusy(false);
+    $("buildScene").textContent = modelStatus.sam3d?.configured
+      ? "生成场景"
+      : "生成占位场景";
     await refreshProjects();
     const id = localStorage.getItem("r2s-project");
     if (id) {
@@ -777,6 +912,7 @@ async function boot() {
         localStorage.removeItem("r2s-project");
       }
     }
+    setBusy(false);
   } catch (error) {
     notice(error.message, "error");
   }

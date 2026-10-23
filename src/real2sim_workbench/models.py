@@ -62,6 +62,7 @@ class SceneRecord(Record):
     image_size: list[int]
     table: TableRecord = Field(default_factory=TableRecord)
     objects: list[ObjectRecord] = Field(default_factory=list)
+    preprocessing: dict = Field(default_factory=dict)
     reports: dict = Field(default_factory=dict)
 
     @model_validator(mode="after")

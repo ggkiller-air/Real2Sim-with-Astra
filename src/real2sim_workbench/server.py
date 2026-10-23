@@ -13,6 +13,7 @@ from pydantic import Field
 from .models import Record, SceneRecord, ObjectRecord
 from .store import Store, atomic_json
 from . import adapters, geometry, physics
+from .segmentation import AUTO_LABELS, load_mask, duplicate
 
 
 class SegmentRequest(Record):
@@ -121,6 +122,8 @@ def create_app(root=None):
             original = store.load(sid)
             if scene.id != sid or scene.image != original.image or scene.image_sha256 != original.image_sha256 or scene.image_size != original.image_size:
                 raise ValueError("不能修改原图身份信息")
+            if scene.preprocessing != original.preprocessing:
+                raise ValueError("自动背景与排除区域不能由编辑接口修改")
             original_items = {o.id: o for o in original.objects}
             if set(original_items) != {o.id for o in scene.objects}:
                 raise ValueError("此接口仅编辑现有物体；取消勾选可排除物体")
@@ -148,7 +151,7 @@ def create_app(root=None):
             raise ValueError("SAM3 未配置")
         scene = store.load(sid)
         w, h = scene.image_size
-        if req.mode not in ("text", "instance"):
+        if req.mode not in ("text", "instance", "auto"):
             raise ValueError("未知分割模式")
         if req.mode == "text" and (not req.labels or any(not v.strip() or len(v)>100 for v in req.labels)):
             raise ValueError("请提供 1–12 个物体描述")
@@ -164,8 +167,28 @@ def create_app(root=None):
         def operation(scene, folder):
             request = req.model_dump()
             request["image"] = str(store.asset(sid, scene.image))
+            if req.mode == "auto":
+                request["labels"] = AUTO_LABELS
+            request["exclusion_masks"] = [str(store.asset(sid, scene.preprocessing["exclusion_mask"]))] if scene.preprocessing.get("exclusion_mask") else []
             result = adapters.run_worker("sam3", request, folder)
+            background = result.get("background", {})
+            if background:
+                for key in ("exclusion_mask", "table_mask"):
+                    if background.get(key):
+                        scene.preprocessing[key] = str((folder/background[key]).relative_to(store.path(sid)))
+                scene.preprocessing["exclude_labels"] = ["robot arm", "robot gripper"]
+                scene.preprocessing["background"] = "simplified_support_plane"
+                # A visible mask bounding rectangle is only an image-plane approximation.
+                if background.get("table_bbox") and scene.table.calibration_source == "assumed":
+                    x1,y1,x2,y2 = background["table_bbox"]
+                    scene.table.corners = [[x1,y1],[x2,y1],[x2,y2],[x1,y2]]
+                    scene.preprocessing["table_mapping"] = "detected_mask_bounds_assumed_not_metric_calibration"
+            existing_masks = [load_mask(store.asset(sid,o.mask)) for o in scene.objects if o.mask]
+            added = 0
             for row in result["objects"]:
+                if not req.object_id and duplicate(load_mask(folder/row["mask"]), existing_masks):
+                    continue
+                added += 1
                 mask = str((folder/row["mask"]).relative_to(store.path(sid)))
                 if req.object_id:
                     obj = next(o for o in scene.objects if o.id == req.object_id)
@@ -176,7 +199,7 @@ def create_app(root=None):
                 else:
                     scene.objects.append(ObjectRecord(id="o_"+uuid.uuid4().hex[:12], name=row["name"],
                                                       bbox=row["bbox"], score=row["score"], mask=mask))
-            scene.reports["segmentation"] = {"backend": "official_sam3", "candidate_count": len(result["objects"]), "job": folder.name}
+            scene.reports["segmentation"] = {"backend": "official_sam3", "candidate_count": len(result["objects"]), "added_count": added, "job": folder.name}
         return submit(sid, "segment", operation)
 
     @app.post("/api/projects/{sid}/region")

@@ -8,11 +8,13 @@
 | GET / POST `/api/projects` | 列表；multipart file 上传图片 |
 | GET `/api/projects/{id}` | 返回 scene 和当前 job |
 | PUT `/api/projects/{id}` | 完整场景与当前 revision；编辑已有物体元数据 |
-| POST `/api/projects/{id}/segment` | 文字候选、框/点实例修正 |
+| POST `/api/projects/{id}/segment` | 自动扫描、文字候选、框/点实例修正 |
 | POST `/api/projects/{id}/objects/{oid}/mesh` | multipart file 网格导入 |
 | POST `/api/projects/{id}/actions/{action}` | 后台几何/布局/检查/导出 |
 | GET `/api/jobs/{job_id}` | queued/running/done/failed；失败带 error |
 | GET `/api/projects/{id}/download` | 当前导出 ZIP |
+
+自动扫描：`{"mode":"auto"}`。内置桌面类别提示、机器人排除掩码和重复候选合并；已有物体（包括用户删除的物体）不会因再次扫描而重复加入。`scene.preprocessing` 保留背景/排除来源，不能通过 PUT 修改。检测到桌面时仅设置掩码边界近似，`calibration_source` 仍为 assumed。
 
 文字分割：`{"mode":"text","labels":["paper cup","bowl"]}`。
 
