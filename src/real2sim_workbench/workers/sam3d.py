@@ -27,12 +27,20 @@ def main():
     model = Inference(os.environ['R2S_SAM3D_CONFIG'], compile=False)
     image = np.asarray(Image.open(req['image']).convert('RGB'))
     rgba = np.dstack([image, np.full(image.shape[:2],255,dtype=np.uint8)])
-    progress('正在估计共同深度与相机')
-    with torch.inference_mode():
-        depth = model._pipeline.compute_pointmap(rgba)
-        pointmap = depth['pointmap'].permute(1,2,0)
-        np.savez_compressed(dest.parent/'camera_geometry.npz',
-                            pointmap=pointmap.cpu().numpy(), intrinsics=depth['intrinsics'].cpu().numpy())
+    if req.get('registered_depth'):
+        progress('正在读取已标定的传感器深度')
+        sensor=np.load(req['registered_depth'],allow_pickle=False)
+        pointmap=torch.as_tensor(sensor['pointmap'],dtype=torch.float32,device='cuda')
+        if tuple(pointmap.shape)!=(*image.shape[:2],3):raise ValueError('RGB/depth shape mismatch')
+        K=sensor['K'];intrinsics=K.copy();intrinsics[0,:]/=image.shape[1];intrinsics[1,:]/=image.shape[0]
+        np.savez_compressed(dest.parent/'camera_geometry.npz',pointmap=sensor['pointmap'],intrinsics=intrinsics,K=K,observed_valid=sensor['observed_valid'])
+    else:
+        progress('正在估计共同深度与相机')
+        with torch.inference_mode():
+            depth = model._pipeline.compute_pointmap(rgba)
+            pointmap = depth['pointmap'].permute(1,2,0)
+            np.savez_compressed(dest.parent/'camera_geometry.npz',
+                                pointmap=pointmap.cpu().numpy(), intrinsics=depth['intrinsics'].cpu().numpy())
     outputs=[]
     for index,row in enumerate(req['objects']):
         progress('正在生成物体',current=index+1,total=len(req['objects']),object_id=row['id'])
@@ -54,6 +62,7 @@ def main():
         camera_mesh.export(dest.parent/camera_name)
         outputs.append({'id':row['id'],'mesh':filename,'camera_mesh':camera_name,'raw_model_pose':pose})
         dest.write_text(json.dumps({'backend':'official_sam3d','objects':outputs,'camera_geometry':'camera_geometry.npz',
+                                    'input_geometry':'sensor_metric_depth' if req.get('registered_depth') else 'predicted_single_image_depth',
                                     'complete':len(outputs)==len(req['objects']), 'camera_frame':'pytorch3d_x_left_y_up_z_forward'}))
         del result
         torch.cuda.empty_cache()

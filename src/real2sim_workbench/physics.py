@@ -45,7 +45,13 @@ def export_scene(scene, folder, output):
     ET.SubElement(world, "geom", name="floor", type="plane", size="5 5 .1", pos="0 0 -0.8", rgba="0.16 0.19 0.22 1")
     camera=scene.preprocessing.get("camera")
     if camera:
-        ET.SubElement(world,"camera",name="source",pos=numbers(camera["position"]),xyaxes=numbers(camera["xyaxes"]),fovy=str(camera["fovy"]))
+        camera_attrs=dict(name="source",pos=numbers(camera["position"]),xyaxes=numbers(camera["xyaxes"]))
+        if camera.get("K"):
+            K=np.asarray(camera["K"]);w,h=camera["resolution"]
+            camera_attrs.update(sensorsize=numbers([w*.0001,h*.0001]),resolution=f"{w} {h}",
+                focalpixel=numbers([K[0,0],K[1,1]]),principalpixel=numbers([w/2-K[0,2],h/2-K[1,2]]))
+        else:camera_attrs['fovy']=str(camera['fovy'])
+        ET.SubElement(world,"camera",**camera_attrs)
     warnings = []
     for index, obj in enumerate(objects):
         body = ET.SubElement(world, "body", name=obj.id, pos=numbers(obj.position),

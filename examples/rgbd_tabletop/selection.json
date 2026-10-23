@@ -1,0 +1,11 @@
+{
+  "coordinate_frame": "raw D455 output RGB pixels, before rectification",
+  "objects": [
+    {"name":"hammer","point":[300,319]},
+    {"name":"brush","point":[494,355]},
+    {"name":"carrot","point":[308,376]},
+    {"name":"apple","point":[414,315]},
+    {"name":"green button box","point":[234,369]},
+    {"name":"red button box","point":[415,372]}
+  ]
+}

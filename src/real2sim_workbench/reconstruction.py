@@ -41,6 +41,9 @@ def fit_support_frame(pointmap, table_mask, assumed_width):
 
 
 def assemble(scene, project_folder, job_folder, result):
+    if result.get("input_geometry")=="sensor_metric_depth":
+        from .rgbd import assemble_metric
+        return assemble_metric(scene,project_folder,job_folder,result)
     project_folder,job_folder=Path(project_folder),Path(job_folder)
     camera=np.load(job_folder/result['camera_geometry'])
     pointmap=camera['pointmap']

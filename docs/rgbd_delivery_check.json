@@ -1,0 +1,8 @@
+{
+  "zip": "outputs/rgbd-tabletop-mujoco.zip",
+  "extracted_native_load": true,
+  "free_joints": 6,
+  "meshes": 55,
+  "textures": 6,
+  "bytes": 6651380
+}

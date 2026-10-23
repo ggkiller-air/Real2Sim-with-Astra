@@ -1,0 +1,237 @@
+{
+  "date": "2026-10-23",
+  "stage": "rgbd_to_mujoco_v0",
+  "project": "runs/baab9bd8867f4b44",
+  "core_tests_passed": 28,
+  "input": "examples/rgbd_tabletop/capture",
+  "primary": "D455 rectified RGB + calibrated sensor depth",
+  "sam3_actual": true,
+  "sam3d_actual_sensor_pointmap": true,
+  "real_meshes": 6,
+  "robot_assets": 0,
+  "astra_actual_model": "gpt-6-astra",
+  "astra_auxiliary_rgb_views": 2,
+  "calibrated_multiview_geometry_fusion": false,
+  "support_plane": {
+    "method": "observed D455 depth RANSAC + SVD",
+    "inlier_fraction": 0.8435,
+    "rms_m": 0.0018745431443676353,
+    "scale_source": "sensor_depth_metres",
+    "meters_per_model_unit": 1.0,
+    "origin_model": [
+      -0.052717842161655426,
+      -0.28714776039123535,
+      1.0339823961257935
+    ],
+    "world_basis_columns": [
+      [
+        -0.9999321455544891,
+        0.0,
+        0.011649218387901783
+      ],
+      [
+        0.010640579206910493,
+        0.4070278921189545,
+        0.9133537411689758
+      ],
+      [
+        -0.004741556805261028,
+        0.9134157204882685,
+        -0.40700027346611023
+      ]
+    ]
+  },
+  "registered_valid_fraction": 0.9542024739583334,
+  "native_validation": {
+    "physics_check_pass": true,
+    "simulated_seconds": 10.000000000000009,
+    "contact_samples": 5000,
+    "initial_max_penetration_m": 0.00017952678570350207,
+    "max_translation_m": 0.0018981279281967483,
+    "all_support_contacts": true,
+    "warnings": []
+  },
+  "mean_silhouette_iou": 0.7575537662526828,
+  "per_object_silhouette": [
+    {
+      "id": "o_076d49eb8d4b",
+      "iou": 0.6686692700510664,
+      "rendered_pixels": 2789,
+      "reference_pixels": 2766,
+      "rendered_centroid": [
+        287.54750806740765,
+        317.1642165650771
+      ],
+      "reference_centroid": [
+        288.1746203904555,
+        318.6587129428778
+      ]
+    },
+    {
+      "id": "o_832c715c291a",
+      "iou": 0.8823051948051948,
+      "rendered_pixels": 3472,
+      "reference_pixels": 3485,
+      "rendered_centroid": [
+        492.79233870967744,
+        357.6215437788018
+      ],
+      "reference_centroid": [
+        492.4464849354376,
+        357.4249641319943
+      ]
+    },
+    {
+      "id": "o_c7ad0c7b5c3c",
+      "iou": 0.4094775212636695,
+      "rendered_pixels": 1770,
+      "reference_pixels": 1710,
+      "rendered_centroid": [
+        316.4418079096045,
+        369.59774011299436
+      ],
+      "reference_centroid": [
+        308.1421052631579,
+        374.7795321637427
+      ]
+    },
+    {
+      "id": "o_4bb1115fef28",
+      "iou": 0.8065454545454546,
+      "rendered_pixels": 1228,
+      "reference_pixels": 1256,
+      "rendered_centroid": [
+        417.95765472312706,
+        314.9828990228013
+      ],
+      "reference_centroid": [
+        415.39171974522293,
+        314.42754777070064
+      ]
+    },
+    {
+      "id": "o_38544235a765",
+      "iou": 0.8754069251257769,
+      "rendered_pixels": 3206,
+      "reference_pixels": 3131,
+      "rendered_centroid": [
+        233.57953836556456,
+        364.7470368059888
+      ],
+      "reference_centroid": [
+        233.51868412647715,
+        362.83136378153944
+      ]
+    },
+    {
+      "id": "o_ab71e6a0005d",
+      "iou": 0.902918231724935,
+      "rendered_pixels": 3293,
+      "reference_pixels": 3293,
+      "rendered_centroid": [
+        412.835712116611,
+        363.55056179775283
+      ],
+      "reference_centroid": [
+        412.8411782569086,
+        363.40935317339813
+      ]
+    }
+  ],
+  "depth_agreement": {
+    "objects": [
+      {
+        "id": "o_076d49eb8d4b",
+        "name": "hammer",
+        "shared_pixels": 1809,
+        "observed_mask_pixels": 2076,
+        "coverage": 0.8713872832369942,
+        "median_abs_z_error_m": 0.04214000701904297,
+        "p90_abs_z_error_m": 0.07128055393695831
+      },
+      {
+        "id": "o_832c715c291a",
+        "name": "brush",
+        "shared_pixels": 3017,
+        "observed_mask_pixels": 3046,
+        "coverage": 0.9904793171372291,
+        "median_abs_z_error_m": 0.005201578140258789,
+        "p90_abs_z_error_m": 0.016401182860136032
+      },
+      {
+        "id": "o_c7ad0c7b5c3c",
+        "name": "carrot",
+        "shared_pixels": 861,
+        "observed_mask_pixels": 1398,
+        "coverage": 0.6158798283261803,
+        "median_abs_z_error_m": 0.010716378688812256,
+        "p90_abs_z_error_m": 0.023431241512298584
+      },
+      {
+        "id": "o_4bb1115fef28",
+        "name": "apple",
+        "shared_pixels": 948,
+        "observed_mask_pixels": 1010,
+        "coverage": 0.9386138613861386,
+        "median_abs_z_error_m": 0.009421050548553467,
+        "p90_abs_z_error_m": 0.033577095717191696
+      },
+      {
+        "id": "o_38544235a765",
+        "name": "green button box",
+        "shared_pixels": 2655,
+        "observed_mask_pixels": 2732,
+        "coverage": 0.9718155197657394,
+        "median_abs_z_error_m": 0.006391704082489014,
+        "p90_abs_z_error_m": 0.016658306121826172
+      },
+      {
+        "id": "o_ab71e6a0005d",
+        "name": "red button box",
+        "shared_pixels": 2830,
+        "observed_mask_pixels": 2858,
+        "coverage": 0.9902029391182645,
+        "median_abs_z_error_m": 0.006733238697052002,
+        "p90_abs_z_error_m": 0.014015781693160534
+      }
+    ],
+    "note": "Sensor agreement on shared visible pixels; excludes missing depth, hidden surfaces and independent metrology."
+  },
+  "failed_candidates_preserved": [
+    "jobs/first_stable_but_visually_poor",
+    "jobs/support_v1",
+    "jobs/support_v2",
+    "jobs/support_v3_rocking"
+  ],
+  "limits": [
+    "Rigid bodies only; mass/friction assumed.",
+    "Depth agreement is visible overlap only; no independent 3D ground truth.",
+    "Hammer geometry and orientation remain approximate.",
+    "Supplementary views used for Astra appearance, not calibrated multiview triangulation.",
+    "No UI changes in this stage.",
+    "Actual run used shared pipeline stages; heavy model workers were not rerun just to exercise the combined CLI.",
+    "Final hammer median optical-depth mismatch is 42 mm; carrot visible overlap is 62%. These remain flagged for review despite passing short-term stability."
+  ],
+  "depth_quality": {
+    "status": "needs_review",
+    "flagged_objects": [
+      {
+        "id": "o_076d49eb8d4b",
+        "name": "hammer",
+        "median_abs_z_error_m": 0.04214000701904297,
+        "coverage": 0.8713872832369942
+      },
+      {
+        "id": "o_c7ad0c7b5c3c",
+        "name": "carrot",
+        "median_abs_z_error_m": 0.010716378688812256,
+        "coverage": 0.6158798283261803
+      }
+    ],
+    "thresholds": {
+      "median_depth_error_m": 0.015,
+      "minimum_visible_coverage": 0.8
+    },
+    "note": "Heuristic review criteria, not independent metrology. Physical stability does not establish reconstruction fidelity."
+  }
+}

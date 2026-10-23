@@ -1,0 +1,448 @@
+{
+  "color_calibration": {
+    "status": "front_pose_solved_with_stationary_repeatability_check_not_deployed",
+    "camera": "image_external",
+    "model": "Intel RealSense D455",
+    "serial": "241122302552",
+    "image_size": [
+      640,
+      480
+    ],
+    "K": [
+      [
+        593.3997051532452,
+        0,
+        278.995849609375
+      ],
+      [
+        0,
+        592.5628192608174,
+        195.801997258113
+      ],
+      [
+        0,
+        0,
+        1.0
+      ]
+    ],
+    "distortion_model": "distortion.inverse_brown_conrady",
+    "D": [
+      -0.05547349900007248,
+      0.0684635117650032,
+      -6.947867223061621e-05,
+      0.0007946284022182226,
+      -0.02215714566409588
+    ],
+    "ROI": {
+      "camera_serial": "241122302552",
+      "roi_normalized": [
+        0.2171875,
+        0.239583333333,
+        0.8671875,
+        0.889583333333
+      ],
+      "transform": {
+        "source_image_size": [
+          640,
+          480
+        ],
+        "crop_roi_xyxy": [
+          139,
+          115,
+          555,
+          427
+        ],
+        "resize_scale": [
+          1.5384615384615385,
+          1.5384615384615385
+        ],
+        "padding_ltrb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "output_image_size": [
+          640,
+          480
+        ]
+      },
+      "original_intrinsics": {
+        "fx": 385.7098083496094,
+        "fy": 385.16583251953125,
+        "ppx": 320.17230224609375,
+        "ppy": 242.09629821777344
+      },
+      "output_intrinsics": {
+        "fx": 593.3997051532452,
+        "fy": 592.5628192608174,
+        "ppx": 278.995849609375,
+        "ppy": 195.801997258113
+      },
+      "distortion_model": "distortion.inverse_brown_conrady",
+      "distortion_coeffs": [
+        -0.05547349900007248,
+        0.0684635117650032,
+        -6.947867223061621e-05,
+        0.0007946284022182226,
+        -0.02215714566409588
+      ],
+      "fps": 15
+    },
+    "base_from_camera": [
+      [
+        -0.0635567519624662,
+        0.43134801941434653,
+        -0.8999441235028438,
+        1.301084741348743
+      ],
+      [
+        0.9979559819105145,
+        0.021449230831603383,
+        -0.06019791247006395,
+        -0.017399503806495614
+      ],
+      [
+        -0.006663141076282658,
+        -0.9019306052263959,
+        -0.43182957970354985,
+        0.6659348646180847
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "camera_from_base": [
+      [
+        -0.0635567519624662,
+        0.9979559819105145,
+        -0.006663141076282658,
+        0.1044938770445841
+      ],
+      [
+        0.43134801941434653,
+        0.021449230831603383,
+        -0.9019306052263959,
+        0.03977991518884044
+      ],
+      [
+        -0.8999441235028438,
+        -0.06019791247006395,
+        -0.43182957970354985,
+        1.4574265260468207
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "transform_convention": "p_base = base_from_camera @ p_camera; metres; column vectors",
+    "source_reference_camera": "image_external_2",
+    "correspondences": "Detected ArUco marker corners at known board positions, allowing partial board views",
+    "front_pixel_error_definition": "SDK deprojected ray residual converted to pixel units with local numerical Jacobian",
+    "repeatability": [
+      {
+        "translation_mm": 3.4519062074158944,
+        "rotation_deg": 0.33859897202421796
+      },
+      {
+        "translation_mm": 1.769683263455298,
+        "rotation_deg": 0.15526346954535253
+      },
+      {
+        "translation_mm": 1.9244748679608654,
+        "rotation_deg": 0.19408284647221047
+      },
+      {
+        "translation_mm": 2.3018529863580364,
+        "rotation_deg": 0.22285379750495463
+      }
+    ],
+    "max_repeat_translation_mm": 3.4519062074158944,
+    "max_repeat_rotation_deg": 0.33859897202421796,
+    "samples": [
+      {
+        "sample": 0,
+        "front_markers": 9,
+        "front_marker_ids": [
+          1,
+          3,
+          4,
+          7,
+          10,
+          17,
+          14,
+          8,
+          21
+        ],
+        "side_markers": 9,
+        "front_pixel_equivalent_rms": 1.0959666034303819,
+        "side_reprojection_rms_px": 0.9474275582269993,
+        "base_from_front_camera": [
+          [
+            -0.06869100218399904,
+            0.4293654698518242,
+            -0.9005147636312696,
+            1.3024150334707145
+          ],
+          [
+            0.9976009427076012,
+            0.021784010520755154,
+            -0.06571009050776179,
+            -0.014275826344934225
+          ],
+          [
+            -0.008596820799832072,
+            -0.9028680690912456,
+            -0.42983176300452897,
+            0.6653114719239102
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "source": "E:\\Codex\\roboprobe_franka_trial\\front_calibration_20261016T170044Z\\sample_00"
+      },
+      {
+        "sample": 1,
+        "front_markers": 10,
+        "front_marker_ids": [
+          3,
+          1,
+          12,
+          7,
+          10,
+          8,
+          14,
+          19,
+          21,
+          17
+        ],
+        "side_markers": 9,
+        "front_pixel_equivalent_rms": 1.1731938310349503,
+        "side_reprojection_rms_px": 0.9862498852544253,
+        "base_from_front_camera": [
+          [
+            -0.06285487416856973,
+            0.4336801098210211,
+            -0.8988719748322792,
+            1.2996294269764135
+          ],
+          [
+            0.9980027027655551,
+            0.021614131665801672,
+            -0.059358525798589364,
+            -0.01792485257186289
+          ],
+          [
+            -0.006314274772422036,
+            -0.9008076329927278,
+            -0.43417247526315816,
+            0.666793845179781
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "source": "E:\\Codex\\roboprobe_franka_trial\\front_calibration_20261016T170044Z\\sample_01"
+      },
+      {
+        "sample": 2,
+        "front_markers": 9,
+        "front_marker_ids": [
+          3,
+          12,
+          1,
+          7,
+          10,
+          17,
+          14,
+          19,
+          21
+        ],
+        "side_markers": 9,
+        "front_pixel_equivalent_rms": 1.107230816266129,
+        "side_reprojection_rms_px": 0.9725632871767222,
+        "base_from_front_camera": [
+          [
+            -0.06179596437082498,
+            0.4287863241294731,
+            -0.9012899350525418,
+            1.3023536026453015
+          ],
+          [
+            0.9980678949565875,
+            0.02070249733045992,
+            -0.058582281119888016,
+            -0.018237436360614194
+          ],
+          [
+            -0.006460328506120542,
+            -0.9031686967802954,
+            -0.42923719469749594,
+            0.6647552614804757
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "source": "E:\\Codex\\roboprobe_franka_trial\\front_calibration_20261016T170044Z\\sample_02"
+      },
+      {
+        "sample": 3,
+        "front_markers": 10,
+        "front_marker_ids": [
+          1,
+          4,
+          7,
+          10,
+          15,
+          8,
+          14,
+          17,
+          16,
+          21
+        ],
+        "side_markers": 9,
+        "front_pixel_equivalent_rms": 1.078915486784245,
+        "side_reprojection_rms_px": 0.9405517660558056,
+        "base_from_front_camera": [
+          [
+            -0.06088775393872232,
+            0.4335535449981451,
+            -0.8990684095439235,
+            1.2999409023025426
+          ],
+          [
+            0.9981306872572021,
+            0.021687684738803253,
+            -0.05713821388647568,
+            -0.019159899948571146
+          ],
+          [
+            -0.005273762960537878,
+            -0.9008667870169331,
+            -0.43406361224367124,
+            0.6668788798881722
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "source": "E:\\Codex\\roboprobe_franka_trial\\front_calibration_20261016T170044Z\\sample_03"
+      }
+    ],
+    "robot_commands": 0,
+    "limitations": [
+      "Stationary repeatability does not establish independent absolute accuracy.",
+      "Inherits side-camera and wrist hand-eye uncertainty.",
+      "Partial marker views give less spatial coverage than full-board Charuco observations.",
+      "Inverse Brown-Conrady coefficients must be used with SDK deprojection, not passed directly as OpenCV forward distortion coefficients."
+    ]
+  },
+  "depth_intrinsics": {
+    "width": 640,
+    "height": 480,
+    "fx": 387.5622863769531,
+    "fy": 387.5622863769531,
+    "ppx": 323.1635437011719,
+    "ppy": 239.24588012695312,
+    "model": "distortion.brown_conrady",
+    "coeffs": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ]
+  },
+  "color_intrinsics_native": {
+    "width": 640,
+    "height": 480,
+    "fx": 386.4453125,
+    "fy": 385.9002990722656,
+    "ppx": 320.17230224609375,
+    "ppy": 242.09629821777344,
+    "model": "distortion.inverse_brown_conrady",
+    "coeffs": [
+      -0.05547349900007248,
+      0.0684635117650032,
+      -6.947867223061621e-05,
+      0.0007946284022182226,
+      -0.02215714566409588
+    ]
+  },
+  "color_from_depth": [
+    [
+      0.9999932646751404,
+      0.0024816652294248343,
+      0.0027022340800613165,
+      -0.05917853116989136
+    ],
+    [
+      -0.002481714589521289,
+      0.9999969005584717,
+      1.4944914255465847e-05,
+      6.959898018976673e-05
+    ],
+    [
+      -0.002702188678085804,
+      -2.1650987036991864e-05,
+      0.9999963641166687,
+      0.0003965296200476587
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ]
+  ],
+  "base_from_depth": [
+    [
+      -0.06219498773859718,
+      0.4312084405734935,
+      -0.9001061501730127,
+      1.3045191034567123
+    ],
+    [
+      0.998058695601213,
+      0.023927060355992978,
+      -0.05750066237584216,
+      -0.07647945039893421
+    ],
+    [
+      -0.003257876854999328,
+      -0.9019349958941177,
+      -0.4318594942640351,
+      0.666095172850466
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ]
+  ],
+  "depth_scale_m": 0.0010000000474974513,
+  "depth_rgb_pixel_alignment": false,
+  "extrinsics_source": "calibration_bundle_20261016.json cameras.front",
+  "note": "Historical extrinsics copied unchanged; validity depends on unchanged camera mounting. RGB is cropped/resized; raw depth is not aligned to RGB."
+}

@@ -12,11 +12,24 @@ def main():
     sub.add_parser("doctor")
     view = sub.add_parser("view")
     view.add_argument("scene", type=Path)
+    build = sub.add_parser("build",help="Single RGB file or calibrated RGB-D capture folder to MuJoCo")
+    build.add_argument("input",type=Path)
+    build.add_argument("--data",default="runs")
+    build.add_argument("--selection",type=Path)
+    build.add_argument("--refine-assets",action="store_true")
+    build.add_argument("--seconds",type=float,default=10)
     args = parser.parse_args()
     if args.command == "serve":
         import uvicorn
         from .server import create_app
         uvicorn.run(create_app(args.data), host="127.0.0.1", port=args.port)
+    elif args.command == "build":
+        if not .1 <= args.seconds <= 30:
+            parser.error("--seconds must be between 0.1 and 30")
+        from .pipeline import build
+        result=build(args.input,args.data,json.loads(args.selection.read_text()) if args.selection else None,args.refine_assets,args.seconds)
+        if not result.reports['validation']['physics_check_pass']:
+            raise SystemExit("Exported with failed physical validation; inspect validation.json")
     elif args.command == "doctor":
         from .adapters import status
         print(json.dumps(status(), ensure_ascii=False, indent=2))

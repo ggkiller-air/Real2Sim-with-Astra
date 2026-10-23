@@ -1,6 +1,6 @@
 # Real2Sim with Astra
 
-上传单张图片后自动分割，少量增删物体并选择属性，一键生成和检查 MuJoCo 场景。项目提供本地图形界面、共享 Python/API 实现，以及给 Astra 的操作 skill。
+支持单张 RGB 与带标定的 RGB-D 采集文件夹两条输入路径，生成和检查 MuJoCo 场景。单图可使用界面；RGB-D 目前使用无界面入口。项目提供本地图形界面、共享 Python/API 实现，以及给 Astra 的操作 skill。
 
 **v0.1 只处理 MuJoCo 普通刚体。** 特殊结构仅保存标注；后续再加入关节、软体和 Isaac Lab。真实 SAM 3D 推理已在本机 RTX 4090 通过；端到端验证记录见 [docs/validation.json](docs/validation.json)。
 
@@ -10,10 +10,10 @@
 | --- | --- |
 | 本地界面 | 紧凑单页；自动分割、物体卡片、删除/撤回、正负点/框选预览确认、属性自动保存、三维预览 |
 | SAM3 | 独立模型进程；自动类别扫描、掩码去重、机器人排除；文字和框/点 API 保留 |
-| SAM 3D Objects | ModelScope 主权重；独立 CUDA 环境；真实彩色网格、相机位姿与共同预测深度 |
+| SAM 3D Objects | ModelScope 主权重；独立 CUDA 环境；真实彩色网格、相机位姿；单图共同预测深度或 RGB-D 实测点图 |
 | 几何输入 | OBJ / GLB / STL / PLY 导入；显式占位盒预演 |
 | 布局 | 界面自动简化背景为支撑平面；SAM3 桌面掩码 + MoGe 平面拟合；共同相机/尺度，自动支撑面 |
-| 资产优化 | Astra 参考图驱动的锤子/按钮盒参数化候选；同视角前后对照，保留原资产，尚不自动替换场景 |
+| 资产优化 | Astra 参考图驱动的锤子/按钮盒参数化候选；同视角前后对照，保留原资产，界面保留候选；无界面入口可采纳并进入深度/姿态与物理复检 |
 | 布局优化 | 真实凸体接触消穿插、重力落稳；Astra 多视角提出位置建议或稳定姿态搜索目标，经渲染与物理复检决定采纳 |
 | MuJoCo | 彩色显示网格与 CoACD 碰撞体分离、质量和摩擦、原生多视角、物理报告、含资产 ZIP |
 | 特殊结构 | 铰链/抽屉/布料/软体标签与备注，当前均按普通刚体处理 |
@@ -45,7 +45,16 @@ bash scripts/run.sh
 4. 点击“生成占位场景”（SAM 3D 就绪时显示“生成场景”），自动生成彩色几何、共同深度布局、接触优化、落桌和 3 秒 MuJoCo 检查，随后采集视角并用 Astra 检查与修正。任一步失败停止流程；占位盒不代表真实三维资产。
 5. 查看“检查结果”和“多视角与 Astra”，再下载 MuJoCo ZIP。解压后加载 `scene.xml`；原生查看器：`.venv/bin/real2sim view /absolute/path/to/scene.xml`。
 
-背景只生成简化桌面和地面，不重建机械臂或远处设备。单图预测深度和假设桌宽不等于尺度标定，默认尺寸与物理参数仍是估计。多视角与深度输入暂未接入。
+背景只生成简化桌面和地面，不重建机械臂或远处设备。单图预测深度和假设桌宽不等于尺度标定，默认尺寸与物理参数仍是估计。RGB-D 无界面输入已接入；补充相机 RGB 用作 Astra 外观参考，尚未进行标定多视角几何融合。
+
+## 单图 / 深度无界面入口
+
+```bash
+bash scripts/build.sh /path/to/image.jpg
+bash scripts/build.sh examples/rgbd_tabletop/capture --selection examples/rgbd_tabletop/selection.json --refine-assets
+```
+
+同一核心流水线自动分割、生成真实网格并导出 MuJoCo。深度路径使用实测米制位置和受深度约束的稳定姿态；单图仍保留原预测路径。原始例子、文件约定和限制见 [RGB-D 桌面例子](examples/rgbd_tabletop/README.md)。本轮未修改界面。
 
 ## 验证与 agent 入口
 
@@ -66,6 +75,7 @@ Astra 工作流见 [skills/real2sim/SKILL.md](skills/real2sim/SKILL.md)，共享
 - `geometry.py`, `reconstruction.py`：颜色/碰撞处理、共同深度与支撑坐标。
 - `asset_refinement.py`, `prompts/astra_asset_refinement.txt`：独立资产候选、参数约束和前后对照。
 - `review.py`, `pose_search.py`, `prompts/astra_scene_review.txt`：Astra 调用、约束建议和测量验收。
+- `rgbd.py`, `depth_pose.py`, `pipeline.py`：传感器配准、米制支撑/稳定姿态、双输入无界面流水线。
 - `physics.py`：MuJoCo 导出及物理检查。
 - `server.py`, `cli.py`：共享 API、本地服务及查看器。
 - `src/real2sim_workbench/web/`：可随 Python 包分发的界面与 Three.js。

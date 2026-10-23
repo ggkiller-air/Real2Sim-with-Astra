@@ -162,7 +162,7 @@ def refine_assets(scene,project,output,object_ids=None,reuse_plan=None):
     for i,obj in enumerate(objects):
         sheet.paste(Image.open(output/obj.id/'reference.png'),(0,i*430+30));sheet.paste(Image.open(before_views[obj.id][1]),(480,i*430+30));draw.text((8,i*430+8),obj.id+' | reference crop / SAM 3D',fill='black')
     sheet.save(output/'input_comparison.png')
-    prompt=(Path(__file__).parents[2]/'prompts/astra_asset_refinement.txt').read_text()+'\n'+json.dumps({'assets':contexts,'parameter_bounds':PARAMS},ensure_ascii=False)
+    prompt=(Path(__file__).parents[2]/'prompts/astra_asset_refinement.txt').read_text()+'\n'+json.dumps({'assets':contexts,'parameter_bounds':PARAMS,'auxiliary_views':scene.preprocessing.get('reference_views',[])},ensure_ascii=False)
     atomic_json(output/'schema.json',SCHEMA);(output/'prompt.txt').write_text(prompt)
     if reuse_plan:
         shutil.copy2(reuse_plan,output/'answer.json')
@@ -170,7 +170,7 @@ def refine_assets(scene,project,output,object_ids=None,reuse_plan=None):
         cmd=shutil.which(os.environ.get('R2S_CODEX_BIN','codex'))
         if not cmd:raise ValueError('Codex CLI is required for Astra asset refinement')
         with (output/'astra.log').open('w') as log:
-            result=subprocess.run([cmd,'exec','--model','gpt-6-astra','--sandbox','read-only','--ephemeral','--ignore-user-config','--skip-git-repo-check','-c','model_reasoning_effort="high"','--output-schema',str(output/'schema.json'),'--output-last-message',str(output/'answer.json'),'--image',str(project/scene.image),'--image',str(output/'input_comparison.png'),'-'],input=prompt,text=True,stdout=log,stderr=subprocess.STDOUT,cwd=output,timeout=600)
+            result=subprocess.run([cmd,'exec','--model','gpt-6-astra','--sandbox','read-only','--ephemeral','--ignore-user-config','--skip-git-repo-check','-c','model_reasoning_effort="high"','--output-schema',str(output/'schema.json'),'--output-last-message',str(output/'answer.json'),'--image',str(project/scene.image),'--image',str(output/'input_comparison.png'),*[arg for view in scene.preprocessing.get('reference_views',[]) for arg in ['--image',str((project/view['image']).resolve())]],'-'],input=prompt,text=True,stdout=log,stderr=subprocess.STDOUT,cwd=output,timeout=600)
         if result.returncode:raise RuntimeError('Astra asset call failed; see astra.log')
     recipes=check_recipes(json.loads((output/'answer.json').read_text()),[o.id for o in objects]);reports=[]
     for recipe in recipes:

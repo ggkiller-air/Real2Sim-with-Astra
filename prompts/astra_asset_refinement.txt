@@ -6,3 +6,5 @@ hammer：canonical X 轴沿柄，锤头位于负 X 端，圆柱锤头轴为 Z。
 button_box：canonical Z 向上，保留 SAM 的估计宽深总高。housing_height（壳体高度/总高）、base_fraction（深色底壳占壳体比例）、button_diameter（帽直径/min宽深）、cap_height（帽厚/总高）、stem_diameter（按钮杆直径/min宽深）。顶壳黄色，底壳深灰，按钮选择 red 或 green。不要保留原始模型幻觉产生的黑洞/圆斑；不要编造螺钉标签。
 
 每个输入 ID 恰好返回一次。parameters 必须完整，未使用模板参数也填合法默认值：head_length=.24,head_diameter=.22,grip_length=.43,shaft_diameter=.055,grip_diameter=.075,housing_height=.73,base_fraction=.45,button_diameter=.48,cap_height=.055,stem_diameter=.30。遵守给定参数边界。描述哪些细节是参考可见、哪些只是近似；仅提出模板范围内的几何方案，不输出代码。
+
+若附带 auxiliary_views，它们是同场景的其他相机 RGB，可用来辨认遮挡结构、按钮颜色及形状。历史相机安装未验证，不把这些视角当作精确多视角三角化或尺寸测量。主视角和规范资产渲染的 ID 对应关系不变。

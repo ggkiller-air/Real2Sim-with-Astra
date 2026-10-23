@@ -1,0 +1,333 @@
+{
+  "rgb": {
+    "image_external": {
+      "name": "image_external",
+      "preprocessing": {
+        "stream_id": "1",
+        "model": "Intel RealSense D455",
+        "serial": "241122302552",
+        "capture_size": [
+          640,
+          480
+        ],
+        "native_color": "RGB8",
+        "jpeg_quality": 95,
+        "crop_roi_xyxy": [
+          139,
+          115,
+          555,
+          427
+        ],
+        "output_size": [
+          640,
+          480
+        ],
+        "interpolation": "INTER_AREA"
+      },
+      "request_started_at_unix": 1792755462.5522046,
+      "request_completed_at_unix": 1792755462.556596,
+      "received_at_unix": 1792755462.4950395,
+      "frame_sequence": 84106,
+      "file": "image_external_rgb.jpg"
+    },
+    "image_wrist": {
+      "name": "image_wrist",
+      "preprocessing": {
+        "stream_id": "2",
+        "model": "ZED-M",
+        "device": "/dev/v4l/by-id/usb-Technologies__Inc._ZED-M-video-index0",
+        "capture_size": [
+          1344,
+          376
+        ],
+        "eye": "left",
+        "eye_size": [
+          672,
+          376
+        ],
+        "native_color": "BGR",
+        "resized_size": [
+          640,
+          358
+        ],
+        "padding_ltrb": [
+          0,
+          61,
+          0,
+          61
+        ],
+        "output_size": [
+          640,
+          480
+        ],
+        "interpolation": "INTER_AREA",
+        "jpeg_quality": 85
+      },
+      "request_started_at_unix": 1792755462.5530565,
+      "request_completed_at_unix": 1792755462.559242,
+      "received_at_unix": 1792755462.5473697,
+      "frame_sequence": 84058,
+      "file": "image_wrist_rgb.jpg"
+    },
+    "image_external_2": {
+      "name": "image_external_2",
+      "preprocessing": {
+        "stream_id": "3",
+        "model": "Intel RealSense D435",
+        "serial": "254522071417",
+        "capture_size": [
+          640,
+          480
+        ],
+        "native_color": "RGB8",
+        "jpeg_quality": 95,
+        "crop_roi_xyxy": null,
+        "output_size": [
+          640,
+          480
+        ]
+      },
+      "request_started_at_unix": 1792755462.5537672,
+      "request_completed_at_unix": 1792755462.558484,
+      "received_at_unix": 1792755462.5159807,
+      "frame_sequence": 84117,
+      "file": "image_external_2_rgb.jpg"
+    }
+  },
+  "d455_depth": {
+    "serial": "241122302552",
+    "model": "Intel RealSense D455",
+    "intrinsics": {
+      "width": 640,
+      "height": 480,
+      "fx": 387.5622863769531,
+      "fy": 387.5622863769531,
+      "ppx": 323.1635437011719,
+      "ppy": 239.24588012695312,
+      "model": "distortion.brown_conrady",
+      "coeffs": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "color_intrinsics_native": {
+      "width": 640,
+      "height": 480,
+      "fx": 386.4453125,
+      "fy": 385.9002990722656,
+      "ppx": 320.17230224609375,
+      "ppy": 242.09629821777344,
+      "model": "distortion.inverse_brown_conrady",
+      "coeffs": [
+        -0.05547349900007248,
+        0.0684635117650032,
+        -6.947867223061621e-05,
+        0.0007946284022182226,
+        -0.02215714566409588
+      ]
+    },
+    "color_from_depth": [
+      [
+        0.9999932646751404,
+        0.0024816652294248343,
+        0.0027022340800613165,
+        -0.05917853116989136
+      ],
+      [
+        -0.002481714589521289,
+        0.9999969005584717,
+        1.4944914255465847e-05,
+        6.959898018976673e-05
+      ],
+      [
+        -0.002702188678085804,
+        -2.1650987036991864e-05,
+        0.9999963641166687,
+        0.0003965296200476587
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "depth_scale_m": 0.0010000000474974513,
+    "invalid_depth_value": 0,
+    "encoding": "uint16_png",
+    "frame_number": 15,
+    "hardware_timestamp_ms": 1792755462737.9731,
+    "timestamp_domain": "timestamp_domain.global_time",
+    "request_started_at_unix": 1792755462.5545769,
+    "received_at_unix": 1792755462.6182857,
+    "valid_fraction": 0.8865657552083334,
+    "rgb_aligned": false,
+    "hardware_synchronized": false,
+    "file": "d455_depth_raw.png"
+  },
+  "health_before": {
+    "ok": true,
+    "source": {
+      "thread_alive": true,
+      "connected": true,
+      "event_age_s": 0.025234717992134392,
+      "image_ages_s": {
+        "image_external": 0.04901376599445939,
+        "image_wrist": 0.0638231560587883,
+        "image_external_2": 0.025234717992134392
+      }
+    },
+    "camera_errors": {},
+    "camera_frames": {
+      "image_external": {
+        "captured_frames": 84086,
+        "repeated_source_frames": 0
+      },
+      "image_wrist": {
+        "captured_frames": 84037,
+        "repeated_source_frames": 0
+      },
+      "image_external_2": {
+        "captured_frames": 84097,
+        "repeated_source_frames": 0
+      }
+    },
+    "source_kind": "standalone_camera_pipelines",
+    "hardware_synchronized": false,
+    "camera_receive_timestamps_are_exposure_timestamps": false
+  },
+  "health_after": {
+    "ok": true,
+    "source": {
+      "thread_alive": true,
+      "connected": true,
+      "event_age_s": 0.013298730016686022,
+      "image_ages_s": {
+        "image_external": 0.013298730016686022,
+        "image_wrist": 0.027865562005899847,
+        "image_external_2": 0.059203448006883264
+      }
+    },
+    "camera_errors": {},
+    "camera_frames": {
+      "image_external": {
+        "captured_frames": 84108,
+        "repeated_source_frames": 0
+      },
+      "image_wrist": {
+        "captured_frames": 84059,
+        "repeated_source_frames": 0
+      },
+      "image_external_2": {
+        "captured_frames": 84118,
+        "repeated_source_frames": 0
+      }
+    },
+    "source_kind": "standalone_camera_pipelines",
+    "hardware_synchronized": false,
+    "camera_receive_timestamps_are_exposure_timestamps": false
+  },
+  "camera_info": {
+    "streams": {
+      "1": {
+        "name": "image_external",
+        "active": true,
+        "width": 640,
+        "height": 480,
+        "fps": 15,
+        "preprocessing": {
+          "stream_id": "1",
+          "model": "Intel RealSense D455",
+          "serial": "241122302552",
+          "capture_size": [
+            640,
+            480
+          ],
+          "native_color": "RGB8",
+          "jpeg_quality": 95,
+          "crop_roi_xyxy": [
+            139,
+            115,
+            555,
+            427
+          ],
+          "output_size": [
+            640,
+            480
+          ],
+          "interpolation": "INTER_AREA"
+        }
+      },
+      "2": {
+        "name": "image_wrist",
+        "active": true,
+        "width": 640,
+        "height": 480,
+        "fps": 15,
+        "preprocessing": {
+          "stream_id": "2",
+          "model": "ZED-M",
+          "device": "/dev/v4l/by-id/usb-Technologies__Inc._ZED-M-video-index0",
+          "capture_size": [
+            1344,
+            376
+          ],
+          "eye": "left",
+          "eye_size": [
+            672,
+            376
+          ],
+          "native_color": "BGR",
+          "resized_size": [
+            640,
+            358
+          ],
+          "padding_ltrb": [
+            0,
+            61,
+            0,
+            61
+          ],
+          "output_size": [
+            640,
+            480
+          ],
+          "interpolation": "INTER_AREA",
+          "jpeg_quality": 85
+        }
+      },
+      "3": {
+        "name": "image_external_2",
+        "active": true,
+        "width": 640,
+        "height": 480,
+        "fps": 15,
+        "preprocessing": {
+          "stream_id": "3",
+          "model": "Intel RealSense D435",
+          "serial": "254522071417",
+          "capture_size": [
+            640,
+            480
+          ],
+          "native_color": "RGB8",
+          "jpeg_quality": 95,
+          "crop_roi_xyxy": null,
+          "output_size": [
+            640,
+            480
+          ]
+        }
+      }
+    },
+    "source": "standalone_camera_pipelines"
+  },
+  "hardware_synchronized": false,
+  "receive_timestamp_span_s": 0.1232461929321289,
+  "timestamp_note": "Host receive timestamps, not synchronized exposure timestamps.",
+  "calibration_note": "Original 2026-10-16 bundle copied verbatim. Its older extrinsics are not revalidated by this capture.",
+  "robot_motion": false
+}
