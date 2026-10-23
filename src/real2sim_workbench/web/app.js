@@ -26,7 +26,8 @@ let reference = null,
   previewGeneration = 0,
   removed = [],
   thumbnails = new Map(),
-  building = false;
+  building = false,
+  selectionPreview = null;
 const colors = [
   "#d9754e",
   "#3d9b81",
@@ -145,7 +146,7 @@ function rebuild3D() {
   const table = scene?.table || { width: 1.2, depth: 0.8 };
   const tableMesh = new THREE.Mesh(
     new THREE.BoxGeometry(table.width, table.depth, 0.05),
-    new THREE.MeshStandardMaterial({ color: "#becbbb", roughness: 0.9 }),
+    new THREE.MeshStandardMaterial({ color: "#147a7e", roughness: 0.9 }),
   );
   tableMesh.position.z = -0.025;
   group.add(tableMesh);
@@ -169,7 +170,9 @@ function rebuild3D() {
         return;
       }
       node.position.set(...obj.position);
-      node.rotation.z = obj.yaw;
+      const q = obj.orientation || [1,0,0,0];
+      node.quaternion.set(q[1],q[2],q[3],q[0]);
+      node.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1),obj.yaw));
       node.userData.id = obj.id;
       group.add(node);
     };
@@ -178,7 +181,15 @@ function rebuild3D() {
         fileURL(obj.mesh),
         (node) => {
           node.traverse((child) => {
-            if (child.isMesh) child.material = material;
+            if (child.isMesh) {
+              const textured = material.clone();
+              textured.color.set(0xffffff);
+              if (obj.visual_texture) {
+                textured.map = new THREE.TextureLoader().load(fileURL(obj.visual_texture));
+                textured.map.colorSpace = THREE.SRGBColorSpace;
+              } else if (child.geometry.attributes.color) textured.vertexColors = true;
+              child.material = textured;
+            }
           });
           node.scale.set(...obj.size);
           put(node);
@@ -231,6 +242,9 @@ function draw() {
       );
     }
   });
+  if (selectionPreview) {
+    ctx.save();ctx.globalAlpha=.6;ctx.drawImage(selectionPreview,0,0);ctx.restore();
+  }
   if (box) {
     ctx.strokeStyle = "#fff";
     ctx.lineWidth = 3;
@@ -275,6 +289,14 @@ const imageLoad = (url) =>
 async function loadImages() {
   const sid = scene.id;
   reference = await imageLoad(fileURL(scene.image));
+  selectionPreview=null;
+  if(scene.reports.selection_preview?.mask){
+    const raw=await imageLoad(fileURL(scene.reports.selection_preview.mask));
+    const overlay=document.createElement("canvas");overlay.width=raw.width;overlay.height=raw.height;
+    const cx=overlay.getContext("2d");cx.drawImage(raw,0,0);const pixels=cx.getImageData(0,0,raw.width,raw.height);
+    for(let i=0;i<pixels.data.length;i+=4){const alpha=pixels.data[i];pixels.data[i]=255;pixels.data[i+1]=190;pixels.data[i+2]=40;pixels.data[i+3]=alpha;}cx.putImageData(pixels,0,0);selectionPreview=overlay;
+  }
+  $("acceptSelection").hidden=!selectionPreview;
   if (scene.id !== sid) return;
   canvas.width = reference.width;
   canvas.height = reference.height;
@@ -338,29 +360,16 @@ canvas.addEventListener("pointerdown", (event) => {
     start = [x, y];
     box = [x, y, x, y];
     canvas.setPointerCapture(event.pointerId);
-  } else if (mode === "positive" || mode === "negative") {
-    points.push([x, y, mode === "positive" ? 1 : 0]);
-    draw();
-  } else if (mode === "table") {
-    tablePoints.push([x, y]);
-    if (tablePoints.length === 4) {
-      scene.table.corners = tablePoints;
-      scene.table.calibration_source = "user";
-      tablePoints = [];
-      setMode("select");
-      change();
-      renderCalibration();
-      notice("桌面四角已标注，请确认桌宽和桌深后保存。");
-    }
+  } else if (mode === "points") {
+    points.push([x,y,event.button===2||event.shiftKey ? 0 : 1]);
+    selectionPreview=null;$("acceptSelection").hidden=true;
     draw();
   } else {
     const candidates = scene.objects.filter(
       (o) =>
-        o.selected &&
-        x >= o.bbox[0] &&
-        x <= o.bbox[2] &&
-        y >= o.bbox[1] &&
-        y <= o.bbox[3],
+        o.selected && (masks.has(o.id)
+          ? masks.get(o.id).getContext("2d").getImageData(Math.floor(x),Math.floor(y),1,1).data[3]>127
+          : x>=o.bbox[0]&&x<=o.bbox[2]&&y>=o.bbox[1]&&y<=o.bbox[3]),
     );
     candidates.sort(
       (a, b) =>
@@ -370,6 +379,7 @@ canvas.addEventListener("pointerdown", (event) => {
     if (candidates.length) select(candidates[0].id);
   }
 });
+canvas.addEventListener("contextmenu",event=>{if(mode==="points")event.preventDefault();});
 canvas.addEventListener("pointermove", (event) => {
   if (start) {
     const [x, y] = point(event);
@@ -390,14 +400,17 @@ canvas.addEventListener("pointerup", async () => {
 });
 function setMode(next) {
   mode = next;
-  canvas.classList.toggle("adding", mode === "box");
-  $("cancelAdd").hidden = mode !== "box";
+  canvas.classList.toggle("adding", mode !== "select");
+  $("cancelAdd").hidden = mode === "select" && !selectionPreview;
+  $("pointPreview").hidden=mode!=="points";
 }
-$("cancelAdd").onclick = () => {
-  box = null;
-  setMode("select");
-  draw();
-  notice("已取消添加。");
+$("cancelAdd").onclick = async () => {
+  if (scene?.reports.selection_preview) {
+    try {scene=await api(`/api/projects/${scene.id}/selection/preview`,json("DELETE",{revision:scene.revision}));}
+    catch(error){notice(error.message,"error");return;}
+  }
+  box = null; points=[];selectionPreview=null;$("acceptSelection").hidden=true;
+  setMode("select");draw();notice("已取消添加。");
 };
 $("newSelection").onclick = () => {
   if (!scene || busy) return;
@@ -407,10 +420,11 @@ $("newSelection").onclick = () => {
   showView(false);
   setMode("box");
   draw();
-  notice("在图片上框住遗漏的物体，松开后自动添加。");
+  selectionPreview=null;$("acceptSelection").hidden=true;
+  notice("框住目标后查看分割预览，再确认加入。");
 };
 async function addRegion() {
-  const chosenBox = [...box];
+  const chosenBox = box ? [...box] : null;
   setMode("select");
   setBusy(true);
   try {
@@ -422,6 +436,7 @@ async function addRegion() {
           json("POST", {
             mode: "instance",
             box: chosenBox,
+            points, preview:true,
             label: "添加的物体",
           }),
         ),
@@ -435,7 +450,8 @@ async function addRegion() {
       render();
       notice("已保存框选区域；本机 SAM3 尚未就绪。");
     }
-    if (scene.reports.segmentation?.added_count === 0)
+    if(scene.reports.selection_preview){setMode("points");notice("橙色区域是候选：确认加入，或继续左键加正点、右键加负点后重新预览。");}
+    else if (scene.reports.segmentation?.added_count === 0)
       notice("没有新增物体：目标可能已存在，或属于排除的机械臂区域。");
     selected = scene.objects.filter((o) => o.selected).at(-1)?.id;
     box = null;
@@ -448,6 +464,21 @@ async function addRegion() {
   }
 }
 
+$("pointSelection").onclick=()=>{
+  if(!scene||busy)return;
+  selected=null;box=null;points=[];selectionPreview=null;$("acceptSelection").hidden=true;
+  showView(false);setMode("points");draw();
+  notice("左键点物体作为正点；右键或 Shift+点击排除背景。然后预览选择。");
+};
+$("pointPreview").onclick=async()=>{
+  if(!points.length&&!box){notice("先点击目标物体。","error");return;}
+  await addRegion();
+};
+$("acceptSelection").onclick=async()=>{
+  setBusy(true);
+  try{scene=await api(`/api/projects/${scene.id}/selection/accept`,json("POST",{revision:scene.revision}));dirty=false;selectionPreview=null;points=[];box=null;setMode("select");render();await loadImages();notice("已加入物体清单。");}
+  catch(error){notice(error.message,"error");}finally{setBusy(false);}
+};
 function select(id) {
   selected = id;
   box = null;
@@ -660,6 +691,7 @@ function renderProperties() {
   };
 }
 function renderReport() {
+  $("showViews").hidden=!scene?.reports.views || dirty;
   $("download").classList.toggle("disabled", !scene?.reports.export || dirty);
   if (scene?.reports.export)
     $("download").href = `/api/projects/${scene.id}/download`;
@@ -766,23 +798,30 @@ function setBusy(value) {
     .forEach((el) => (el.disabled = value));
   $("autoDetect").disabled = value || !scene || !modelStatus.sam3?.configured;
   $("newSelection").disabled = value || !scene;
+  $("pointSelection").disabled = value || !scene || !modelStatus.sam3?.configured;
   $("buildScene").disabled = value || !scene?.objects.some((o) => o.selected);
+  $("download").hidden = value || !scene?.reports.export || dirty;
 }
 async function poll(job) {
   setBusy(true);
   const jobNames = {
     segment: "正在识别物体",
+    selection_preview:"正在计算点击分割",
     proxy: "正在准备占位几何",
     initialize: "正在安排物体位置",
     optimize: "正在减少物体穿插",
     validate: "正在检查物理稳定性",
     reconstruct: "正在生成三维资产",
+    settle:"正在让物体落稳",
+    capture:"正在采集多视角",
+    review:"Astra 正在对照原图检查多视角并验证修正",
   };
   notice(jobNames[job.kind] || "正在处理", "busy");
   try {
     while (job.state === "queued" || job.state === "running") {
       await new Promise((resolve) => setTimeout(resolve, 1000));
       job = await api(`/api/jobs/${job.id}`);
+      if (job.progress) notice(job.progress.stage+(job.progress.current ? ` ${job.progress.current}/${job.progress.total}` : ""),"busy");
     }
     if (job.state === "failed") throw new Error(job.error);
     const result = await api(`/api/projects/${job.scene_id}`);
@@ -837,17 +876,10 @@ $("buildScene").onclick = async () => {
   setBusy(true);
   try {
     await save();
-    const hasMissing = scene.objects.some(
-      (o) => o.selected && o.geometry === "none",
-    );
-    const actions = hasMissing
-      ? [
-          modelStatus.sam3d?.configured ? "reconstruct" : "proxy",
-          "initialize",
-          "optimize",
-          "validate",
-        ]
-      : ["initialize", "optimize", "validate"];
+    const needsRealMeshes = scene.objects.some(o => o.selected && (o.geometry === "none" || o.geometry === "proxy"));
+    const actions = modelStatus.sam3d?.configured
+      ? [...(needsRealMeshes ? ["reconstruct"] : []), "optimize", "settle", "validate", "review"]
+      : ["proxy", "initialize", "optimize", "validate"];
     for (const action of actions)
       await poll(
         await api(
@@ -896,7 +928,7 @@ async function boot() {
     $("modelStatus").innerHTML = ["sam3", "sam3d"]
       .map(
         (key) =>
-          `<div class="model"><span class="dot ${modelStatus[key].configured ? "ok" : ""}"></span><div>${key === "sam3" ? "SAM3" : "SAM 3D Objects"}<small>${modelStatus[key].configured ? "环境已配置" : key === "sam3d" ? (modelStatus[key].weights_present ? "权重已下载，推理环境待配置" : "等待权重与运行环境") : "未配置本地模型"}</small></div></div>`,
+          `<div class="model"><span class="dot ${modelStatus[key].configured ? "ok" : ""}"></span><div>${key === "sam3" ? "SAM3" : "SAM 3D Objects"}<small>${modelStatus[key].configured ? (modelStatus[key].real_inference_verified ? "本机真实推理已通过" : "环境已配置") : key === "sam3d" ? (modelStatus[key].weights_present ? "权重已下载，推理环境待配置" : "等待权重与运行环境") : "未配置本地模型"}</small></div></div>`,
       )
       .join("");
     $("buildScene").textContent = modelStatus.sam3d?.configured
@@ -908,8 +940,8 @@ async function boot() {
       try {
         await openProject(id);
         $("projects").value = id;
-      } catch {
-        localStorage.removeItem("r2s-project");
+      } catch (error) {
+        notice(`打开最近项目失败：${error.message}`,"error");
       }
     }
     setBusy(false);
@@ -918,3 +950,10 @@ async function boot() {
   }
 }
 boot();
+
+$("showViews").onclick=()=>{
+  const views=scene.reports.views, review=scene.reports.astra_review;
+  $("viewsReport").innerHTML=(review ? `<p><strong>Astra 修正前评估：${escape(({good:"较好",partial:"部分匹配",poor:"较差"})[review.review.visual_match] || review.review.visual_match)}</strong> · ${escape(review.review.assessment)}</p><p>${review.accepted?"已采纳并复检位姿修正":"保持原位姿"} · ${escape(review.reason)}</p><p>修正前后平均轮廓匹配：${Number(review.before.mean_iou).toFixed(3)} → ${Number(review.proposal.mean_iou).toFixed(3)}。下方展示修正后的场景；物理结果见“检查结果”。</p><ul>${review.review.limitations.map(x=>`<li>${escape(x)}</li>`).join("")}</ul>`: '<p>尚未运行 Astra 视觉检查。</p>') + `<img src="${fileURL(views.path+'/views.png')}" alt="MuJoCo 原图视角、俯视、侧视和背面" style="width:100%;height:auto">`;
+  $("viewsDialog").showModal();
+};
+$("closeViews").onclick=()=>$("viewsDialog").close();

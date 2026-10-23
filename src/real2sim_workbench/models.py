@@ -21,8 +21,12 @@ class ObjectRecord(Record):
     support: str = "table"
     geometry: Literal["none", "proxy", "imported", "sam3d"] = "none"
     mesh: str | None = None
+    visual_texture: str | None = None
+    collision_meshes: list[str] = Field(default_factory=list)
+    reconstruction: dict = Field(default_factory=dict)
     size: list[float] = Field(default_factory=lambda: [.08, .08, .1], min_length=3, max_length=3)
     position: list[float] = Field(default_factory=lambda: [0, 0, .05], min_length=3, max_length=3)
+    orientation: list[float] = Field(default_factory=lambda:[1,0,0,0], min_length=4, max_length=4)
     yaw: float = 0
     mass: float = Field(default=.1, gt=0, le=1000)
     friction: float = Field(default=.5, ge=0, le=3)
@@ -31,6 +35,8 @@ class ObjectRecord(Record):
 
     @model_validator(mode="after")
     def valid_geometry(self):
+        if abs(sum(v*v for v in self.orientation)-1)>1e-4:
+            raise ValueError("朝向四元数必须归一化")
         if any(v <= 0 or v > 10 for v in self.size):
             raise ValueError("尺寸必须在 0–10 米之间")
         if self.bbox[2] <= self.bbox[0] or self.bbox[3] <= self.bbox[1]:

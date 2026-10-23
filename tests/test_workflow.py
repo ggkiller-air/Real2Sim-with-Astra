@@ -205,3 +205,91 @@ def test_downloaded_weights_do_not_enable_unconfigured_runtime(tmp_path,monkeypa
     assert not status()['sam3d']['configured']
     weights.write_bytes(b'')
     assert not status()['sam3d']['weights_present']
+
+
+def test_point_preview_accept_and_stale_revision(tmp_path,monkeypatch):
+    from real2sim_workbench import adapters
+    monkeypatch.setattr(adapters,'status',lambda:{'sam3':{'configured':True}})
+    def worker(kind,request,folder):
+        assert request['points']==[[250.,180.,1.],[400.,80.,0.]]
+        mask=np.zeros((480,640),dtype=np.uint8);mask[100:240,200:300]=255
+        Image.fromarray(mask).save(folder/'mask.png')
+        return {'objects':[{'name':'hammer','mask':'mask.png','score':.95,'bbox':[200,100,300,240]}]}
+    monkeypatch.setattr(adapters,'run_worker',worker)
+    with TestClient(create_app(tmp_path/'runs')) as client:
+        s=client.post('/api/projects',files={'file':('photo.png',image_bytes())}).json()
+        path='/api/projects/'+s['id']
+        job=client.post(path+'/segment',json={'mode':'instance','preview':True,'points':[[250,180,1],[400,80,0]]}).json()
+        assert wait(client,job)['state']=='done'
+        s=client.get(path).json()['scene'];assert not s['objects'];assert s['reports']['selection_preview']['score']==.95
+        assert client.post(path+'/selection/accept',json={'revision':s['revision']-1}).status_code==409
+        accepted=client.post(path+'/selection/accept',json={'revision':s['revision']})
+        assert accepted.status_code==200
+        s=accepted.json();assert len(s['objects'])==1 and s['objects'][0]['selected']
+        assert 'selection_preview' not in s['reports']
+
+
+def test_colored_mesh_with_separate_collision_loads_in_mujoco(tmp_path):
+    from real2sim_workbench.geometry import prepare_visual_collision
+    import mujoco
+    store,scene=scene_pair(tmp_path)
+    scene.objects=scene.objects[:1]
+    obj=scene.objects[0]
+    mesh=trimesh.creation.box(extents=[.12,.08,.04])
+    mesh.visual.vertex_colors=np.tile([200,30,20,255],(len(mesh.vertices),1))
+    prep=prepare_visual_collision(mesh,store.path(scene.id)/'colored.obj')
+    obj.mesh='colored.obj';obj.geometry='sam3d';obj.size=prep['size'];obj.position=[0,0,.0202]
+    obj.visual_texture=prep['texture'].name;obj.collision_meshes=[p.name for p in prep['collision']]
+    xml=export_scene(scene,store.path(scene.id),tmp_path/'colored_sim')
+    model=mujoco.MjModel.from_xml_path(str(xml))
+    bid=mujoco.mj_name2id(model,mujoco.mjtObj.mjOBJ_BODY,obj.id)
+    gid=mujoco.mj_name2id(model,mujoco.mjtObj.mjOBJ_GEOM,obj.id+'_visual')
+    assert model.ntex==1
+    assert model.geom_contype[gid]==0 and model.geom_conaffinity[gid]==0
+    assert model.body_mass[bid]==pytest.approx(obj.mass)
+    assert validate_scene(scene,xml,tmp_path/'colored_sim',seconds=.5)['physics_check_pass']
+
+
+def test_support_frame_robust_to_depth_outliers():
+    from real2sim_workbench.reconstruction import fit_support_frame
+    xs,ys=np.meshgrid(np.linspace(-.6,.6,100),np.linspace(-.3,.3,80))
+    points=np.stack([xs,ys*.7-.3,ys+1.5],axis=-1)
+    points[:5,:5]=[20,20,20]
+    origin,basis,scale,report=fit_support_frame(points,np.ones(xs.shape,bool),1.2)
+    assert np.linalg.det(basis)==pytest.approx(1)
+    assert report['inlier_fraction']>.95
+    assert np.std(((points[10:]-origin)@basis)[...,2])<1e-6
+    assert 0.8<scale<1.2
+
+
+def test_native_contact_optimizer_actually_separates_overlapping_bodies(tmp_path):
+    from real2sim_workbench.physics import optimize_contacts
+    store,scene=scene_pair(tmp_path,overlap=True)
+    masses=[o.mass for o in scene.objects]
+    report=optimize_contacts(scene,store.path(scene.id),tmp_path/'contacts')
+    assert report['before_penetration_m']>.01
+    assert report['after_penetration_m']<.002
+    assert [o.mass for o in scene.objects]==masses
+    xml=export_scene(scene,store.path(scene.id),tmp_path/'verified')
+    assert validate_scene(scene,xml,tmp_path/'verified',seconds=1)['physics_check_pass']
+
+
+def test_astra_rejects_out_of_bounds_model_proposal(tmp_path,monkeypatch):
+    from real2sim_workbench import review
+    from types import SimpleNamespace
+    import json
+    store,scene=scene_pair(tmp_path)
+    out=tmp_path/'review';views=tmp_path/'views';views.mkdir()
+    monkeypatch.setattr(review.shutil,'which',lambda _: '/mock/codex')
+    def run(args,**kwargs):
+        assert args[args.index('--model')+1]=='gpt-6-astra'
+        assert args[args.index('--sandbox')+1]=='read-only'
+        answer={'assessment':'test','visual_match':'partial','limitations':[],'pose_search_ids':[],
+                'adjustments':[{'id':scene.objects[0].id,'dx_m':100,'dy_m':0,'yaw_deg':0,'reason':'invalid'}]}
+        (out/'answer.json').write_text(json.dumps(answer))
+        return SimpleNamespace(returncode=0)
+    monkeypatch.setattr(review.subprocess,'run',run)
+    original=scene.model_dump()
+    with pytest.raises(ValueError,match='超出保守边界'):
+        review.astra_review(scene,store.path(scene.id),views,out)
+    assert scene.model_dump()==original

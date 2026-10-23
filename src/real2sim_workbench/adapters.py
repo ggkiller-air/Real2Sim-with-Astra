@@ -26,11 +26,21 @@ def verified_weights_present(config):
         return False
 
 
+def runtime_qualification(settings):
+    if not settings["R2S_SAM3D_REPO"]:return False
+    report=Path(settings["R2S_SAM3D_REPO"]).resolve().parent.parent/"runs/sam3d-runtime-qualification.json"
+    try:
+        value=json.loads(report.read_text())
+        return bool(value.get("real_inference_pass") and value.get("python")==settings["R2S_SAM3D_PYTHON"]
+                    and value.get("config")==settings["R2S_SAM3D_CONFIG"])
+    except (OSError,ValueError):return False
+
+
 def status():
     s = settings()
     return {
         "sam3": {"configured": all(Path(s[k]).is_file() for k in ("R2S_SAM3_PYTHON", "R2S_SAM3_CHECKPOINT") if s[k]) and all(s[k] for k in ("R2S_SAM3_PYTHON", "R2S_SAM3_CHECKPOINT")), "description": "本地 SAM3 · 文字候选 / 框与正负点"},
-        "sam3d": {"weights_present": verified_weights_present(s["R2S_SAM3D_CONFIG"]), "configured": all(s[k] and Path(s[k]).exists() for k in ("R2S_SAM3D_PYTHON", "R2S_SAM3D_REPO", "R2S_SAM3D_CONFIG")), "description": "需要独立推理环境；权重就绪不代表已完成真实推理验证"},
+        "sam3d": {"real_inference_verified":runtime_qualification(s), "weights_present": verified_weights_present(s["R2S_SAM3D_CONFIG"]), "configured": all(s[k] and Path(s[k]).exists() for k in ("R2S_SAM3D_PYTHON", "R2S_SAM3D_REPO", "R2S_SAM3D_CONFIG")), "description": "需要独立推理环境；权重就绪不代表已完成真实推理验证"},
         "engine": "MuJoCo", "special_structures": "annotation_only",
     }
 

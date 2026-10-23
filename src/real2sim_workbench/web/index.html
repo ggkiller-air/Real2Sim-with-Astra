@@ -41,14 +41,14 @@
             ><button id="previewTab">场景预览</button>
           </div>
           <span id="imageSize" class="muted"></span
-          ><button id="cancelAdd" hidden>取消添加</button
+          ><button id="pointPreview" hidden>预览选择</button><button id="acceptSelection" class="primary" hidden>确认加入</button><button id="cancelAdd" hidden>取消</button
           ><button id="resetView" hidden>重置视角</button>
         </div>
         <div class="canvas-wrap" id="imageWrap">
           <canvas id="imageCanvas" aria-label="原图与物体分割"></canvas>
           <div id="emptyImage" class="empty">
             <strong>上传图片，自动找出物体</strong>
-            <p>保留想要的，删除多余的；漏掉的框一下就好。</p>
+            <p>保留想要的，删除多余的；漏掉的点选或框选补上。</p>
             <label class="button primary" for="upload">＋ 选择图片</label>
           </div>
         </div>
@@ -65,7 +65,7 @@
           <div class="inline-actions">
             <button id="undoRemove" hidden>撤回删除</button
             ><button id="autoDetect">自动补全</button
-            ><button id="newSelection">＋ 框选添加</button>
+            ><button id="pointSelection">点击选物体</button><button id="newSelection">框选</button>
           </div>
         </div>
         <div id="objects" class="object-grid">
@@ -80,7 +80,7 @@
           >
         </div>
         <div class="inline-actions">
-          <button id="showReport" hidden>检查结果</button
+          <button id="showViews" hidden>多视角与 Astra</button><button id="showReport" hidden>检查结果</button
           ><a id="download" class="button disabled" hidden>下载 MuJoCo</a
           ><button id="buildScene" class="primary">生成占位场景</button>
         </div>
@@ -100,6 +100,10 @@
       </div>
       <div id="report" class="property-body"></div>
     </dialog>
+    <dialog id="viewsDialog" style="max-width:1100px;width:90vw">
+      <div class="dialog-head"><h2>多视角与 Astra 检查</h2><button id="closeViews">关闭</button></div>
+      <div id="viewsReport" class="property-body"></div>
+    </dialog>
     <dialog id="helpDialog">
       <div class="dialog-head">
         <h2>只需要做一点选择</h2>
@@ -108,14 +112,14 @@
       <div class="property-body">
         <p>
           上传后，SAM3
-          自动寻找常见桌面物体并合并重复分割。删除不需要的物体，或用框选补充遗漏；类型和重量在物体卡片上选择，修改自动保存。
+          自动寻找常见桌面物体并合并重复分割。删除不需要的物体，或用正负点击点、框选补充遗漏；类型和重量在物体卡片上选择，修改自动保存。
         </p>
         <p>
           生成时自动建立支撑平面、安排布局、减少穿插并运行短时物理检查。背景使用简化桌面与地面；单张照片的尺寸和接触位置仍是估计，不能保证覆盖所有物体或还原遮挡关系。
         </p>
         <p>
           SAM 3D
-          权重尚未就绪时，按钮会明确生成占位盒；可以在物体详情中导入已有模型。特殊类型目前只保存标注，仍作为普通刚体处理。
+          推理环境尚未配置时，按钮会明确生成占位盒；可以在物体详情中导入已有模型。特殊类型目前只保存标注，仍作为普通刚体处理。
         </p>
         <div id="modelStatus"></div>
       </div>

@@ -1,29 +1,26 @@
 ---
 name: real2sim
-description: Use a local Real2Sim with Astra checkout to select image objects, refine SAM3 masks, edit rigid layouts, and export and check MuJoCo scenes. Special structures are annotations only in v0.1.
+description: "Reconstruct a single-image tabletop scene with a local Real2Sim with Astra checkout: SAM3 selection, real SAM 3D rigid assets, MuJoCo physics, and Astra multiview review. Special structures remain annotations."
 ---
 
 # Real2Sim with Astra
 
-Use the user's Real2Sim-with-Astra checkout and its local API. Read README.md and docs/api.md in that checkout; docs/models.md describes model setup. This skill requires the codebase and installed dependencies, and is not itself a reconstruction implementation.
+Use the user's checkout and its local API; this skill requires the implementation and installed runtimes. Read [API operations](../../docs/api.md) for request formats, [model setup](../../docs/models.md) when a backend is unavailable, and [validation evidence](../../docs/validation.json) before making capability claims.
 
-## Workflow
+## Working sequence
 
-1. Infer object scope from the request. Reuse the current project and preserve necessary support surfaces.
-2. Inspect GET /api/status. Configured paths do not establish successful inference. Explain unavailable backends and continue independent work.
-3. Upload/open the image. Run SAM3 text candidates or instance prompts and inspect overlays. Preserve original-image coordinates and object IDs; allow user corrections in the UI.
-4. Obtain geometry through SAM 3D or mesh import. Proxy boxes require an explicit prototype/layout-rehearsal choice; never silently replace failed reconstruction with proxies.
-5. Edit sizes, poses, provenance and support. v0.1 uses box-bottom projection to a plane, not recovered depth. Hinge/drawer/cloth/soft tags do not create those structures.
-6. Save the current revision. Initialize or optimize as appropriate; initialization replaces unlocked poses. Layout locks do not fix bodies in simulation. Inspect the result against the source.
-7. Validate and examine initial penetration, drift, rotation, velocities, support contacts, warnings and simulated time. Preserve failures. Do not tune friction or add fixed joints merely to hide incorrect support.
-8. Export the current revision and provide the scene ZIP and precise validation conclusions. Distinguish rigid numerical checks from visual accuracy, true parameters and task success.
+- Reuse the current single-image project and respect the user's selected objects. SAM3 automatically proposes common tabletop objects, excludes detected robot arms/grippers, and identifies the support surface. Inspect overlays because this is not exhaustive object discovery.
+- For missed or ambiguous objects use positive/negative points or a box with `preview:true`, inspect the mask, then confirm with `/selection/accept` and the current revision. A box is not a reliable object hit test; the GUI selects existing instances by mask. Preserve stable IDs and user removals.
+- `GET /api/status` distinguishes configured paths from a recorded local inference success. If real reconstruction is requested, use `reconstruct`; never silently turn an inference failure into proxies.
+- Real `reconstruct` preserves GLB colors and model poses, shares predicted depth, fits a support plane, and builds colored visual meshes plus convex collision parts. Do **not** run the older `initialize` afterward: it would replace model layout with a bounding-box heuristic.
+- Run `optimize → settle → validate → review`. Wait for each job before starting the next. Native-contact optimization and settling propose poses; independent validation checks them with unchanged thresholds. A layout lock does not weld a body in simulation.
+- `review` captures the reference camera and diagnostic views, calls `gpt-6-astra`, and tests bounded XY/yaw suggestions and requested stable-support pose hypotheses. Accept only native silhouette improvements that also pass physics. Preserve rejected candidates, failed checks and the original model output. Do not change mass/friction or add fixed joints merely to conceal layout problems.
+- Inspect the final native views and report both physical results and remaining visual mismatches. Deliver the exported ZIP or scene.xml and the local GUI. Unknown scale, inferred unseen surfaces, cropped objects and assumed mass/friction remain explicit; stability is not grasp/task qualification.
 
-## Execution
+## Execution and provenance
 
-Run `bash scripts/run.sh` from the checkout. Default service: http://127.0.0.1:7865. UI and agent use the same API. Poll returned jobs to done/failed, then refetch the scene. Never edit during active jobs. Edits invalidate old reports.
+Launch `bash scripts/run.sh` in the checkout; default UI/API is http://127.0.0.1:7865. UI and agent call the same backend. Never modify scene records during an active job; revisions reject stale edits. Generated requests, assets, candidate scenes, model answers and logs are under `runs/<project>/jobs/<job>/`. Do not commit user images, weights, credentials, environments or generated runs.
 
-Requests, model outputs and logs are stored in runs/<project>/jobs/<job>/. Keep credentials, weights and user images outside Git by default.
+SAM3 and SAM 3D run locally. Astra review sends the reference image, generated views and scene summary through the user's logged-in Codex CLI; use that step when it is part of the user's requested workflow. No unrelated messages or data are needed. The prompt is in [astra_scene_review.txt](../../prompts/astra_scene_review.txt), while [review.py](../../src/real2sim_workbench/review.py) enforces and measures proposals.
 
-## Current boundaries
-
-SAM 3D is unqualified until actual inference succeeds; raw model poses are preserved but their world-frame conversion is not applied. Imported meshes have convex-hull collisions, with no cavities. Only ordinary rigid MuJoCo scenes are implemented; Isaac Lab and special structures are future work.
+Only ordinary rigid MuJoCo scenes are implemented. Hinge/drawer/cloth/soft fields do not create joints or deformables. Multi-view/depth input and Isaac Lab are future stages. Imported meshes and explicit proxy rehearsals retain their separate fallback paths and limitations.

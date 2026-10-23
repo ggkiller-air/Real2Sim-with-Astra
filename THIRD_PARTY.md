@@ -7,3 +7,6 @@
 - Python runtime dependencies and their versions are listed in `environments/core.lock.txt`; each dependency retains its own license.
 
 The project author's own software license has not yet been selected. Public repository visibility does not by itself grant a redistribution license for that code.
+
+- CoACD supplies convex decomposition; fast-simplification supplies mesh decimation; Trimesh supplies support-pose hypotheses. These remain approximate geometry tools. Their exact installed versions are recorded in the core lock.
+- MoGe, PyTorch3D, Utils3D and Kaolin remain external runtimes pinned by scripts/setup_sam3d.sh. Their upstream licenses apply.

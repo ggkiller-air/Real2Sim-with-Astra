@@ -25,12 +25,19 @@ ModelScope 下载（无需改动 SAM3 或 MuJoCo 环境）：
 下载完成只解决主权重获取。还需要独立 Python/CUDA 推理环境；配置中的 MoGe 和代码中的 DINO 等辅助依赖需在首次实际推理时确认，不能把主权重下载完成说成模型已可用。
 
 - 固定源码版本：`f91db411c50efee93d8db7aeb323885650f6f722`。
-- 依照 [官方环境说明](https://github.com/facebookresearch/sam-3d-objects/blob/main/doc/setup.md) 安装独立环境。
-- 在 [官方权重页面](https://huggingface.co/facebook/sam-3d-objects) 申请访问权限，并在本机登录下载。
-- 官方说明要求至少 32 GB 显存；当前主机为 24 GB，因此即便取得权重权限，仍需实际确认运行可行性，不保证当前硬件能跑通。
-- 配置 `R2S_SAM3D_PYTHON`、`R2S_SAM3D_REPO`、`R2S_SAM3D_CONFIG` 后，界面才开放调用入口。
+- Linux / Python 3.11 独立运行时安装：`bash scripts/setup_sam3d.sh`（需要 uv、conda；默认 RTX 4090 的 CUDA 架构 8.9，可通过 TORCH_CUDA_ARCH_LIST 修改）。
+- 脚本固定 PyTorch 2.5.1 / CUDA 12.1、PyTorch3D 源码、Kaolin 0.17、MoGe/Utils3D 修订和运行时依赖。官方 Hydra 补丁仅应用在隔离环境内。
+- 配置 `R2S_SAM3D_PYTHON`、`R2S_SAM3D_REPO`、`R2S_SAM3D_CONFIG` 后开放入口；`configured` 仅表示路径存在。
+- 首次推理还会下载公开的 MoGe 与 DINO 编码器。无需把用户的 HF token 放入仓库。
+- 2026-10-23 在本机 RTX 4090 24 GB 完成了真实锤子推理，输出彩色 GLB 和模型位姿；这取代此前“尚未安装/验证”的状态。不能从单次运行推断所有物体/复杂度都适配 24 GB。
 
-当前状态：2026-10-23 已从用户指定的 ModelScope 来源下载 21 个非空文件（共 13,105,863,596 字节），全部通过该来源提供的 SHA-256 校验。HF 公共元数据隐藏了受限文件的哈希，因此未独立确认与 HF 文件逐字节相同。主权重已就绪，独立推理环境尚未安装/验证。适配器基于官方 API 编写，尚未完成真实模型推理验证。它保存 GLB 以及原始模型姿态，导入几何供手工布局；模型坐标系到场景坐标系的转换尚未实模验证，不自动应用预测位姿。
+ModelScope 主文件 21 个、共 13,105,863,596 字节，全部通过该来源 SHA-256；HF 公共元数据隐藏受限文件哈希，未独立确认与 HF 逐字节一致。安装脚本尚需在第二台干净机器独立重放，当前证据是本机实际安装及推理。
+
+## Astra 视觉检查
+
+使用本机已登录的 Codex CLI，模型明确指定 `gpt-6-astra`，图片通过 `--image` 传入，结果通过 JSON Schema 约束。参考实现遵循 [官方结构化检查循环示例](https://developers.openai.com/cookbook/examples/codex/build_iterative_repair_loops_with_codex)。`prompts/astra_scene_review.txt` 是提示词；`review.py` 实现调用、校验、候选仿真和采纳逻辑，所以不只有 prompt。
+
+图片和几何生成在本机运行；启用 Astra 检查时，参考图、生成视角和场景摘要会通过已登录的 Codex 服务发送给所选模型。该调用需要可用的登录及模型额度。原始对话、凭据和无关文件不包含在构造的请求里。
 
 ## 第一版降级方式
 

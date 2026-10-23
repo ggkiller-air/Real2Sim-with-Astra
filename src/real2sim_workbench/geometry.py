@@ -20,9 +20,10 @@ def import_mesh(source, destination):
 
 
 def half_extent(obj):
-    sx, sy, sz = np.array(obj.size) / 2
-    c, s = abs(np.cos(obj.yaw)), abs(np.sin(obj.yaw))
-    return np.array([c * sx + s * sy, s * sx + c * sy, sz])
+    from scipy.spatial.transform import Rotation
+    q=np.asarray(obj.orientation)
+    rotation=Rotation.from_euler('z',obj.yaw)*Rotation.from_quat(q[[1,2,3,0]])
+    return np.abs(rotation.as_matrix())@(np.array(obj.size)/2)
 
 
 def homography(table, image_size):
@@ -123,3 +124,72 @@ def optimize(scene):
             "objective_after": float(solved.fun) if improved else before, "solver_converged": bool(solved.success),
             "evaluations": int(solved.nfev), "max_translation_bound_m": .15,
             "limitations": ["仅优化 XY，保持高度与朝向", "保守包围盒代替精确碰撞距离；不是 REST3D 复现", "仍需独立 MuJoCo 检查与原图对照"]}
+
+
+def prepare_visual_collision(mesh, destination, max_faces=14000):
+    """Retain appearance separately from a bounded convex collision approximation.
+
+    Input is oriented in world axes. Outputs use unit AABB coordinates so the
+    existing editable SI dimensions remain the single source of scale.
+    """
+    from PIL import Image
+    from scipy.spatial import cKDTree
+    import coacd
+    destination = Path(destination)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    original_vertices = np.asarray(mesh.vertices).copy()
+    visual = mesh.visual.to_color() if hasattr(mesh.visual,"to_color") else mesh.visual
+    colors = np.asarray(visual.vertex_colors)[:, :3]
+    if len(mesh.faces) > max_faces:
+        simple = mesh.simplify_quadric_decimation(face_count=max_faces)
+        _, nearest = cKDTree(original_vertices).query(simple.vertices)
+        colors = colors[nearest]
+        mesh = simple
+    size = mesh.extents.copy()
+    center = mesh.bounds.mean(axis=0)
+    if not np.isfinite(mesh.vertices).all() or np.any(size < 1e-6):
+        raise ValueError("生成网格为空或退化")
+    normalized = (mesh.vertices-center)/size
+    # A triangle occupies its own padded tile, avoiding UV seam bleeding.
+    count = len(mesh.faces)
+    tile = 8
+    side = int(np.ceil(np.sqrt(count)))
+    atlas = np.zeros((side*tile, side*tile, 3), dtype=np.uint8)
+    uv = np.empty((count*3, 2))
+    xx,yy=np.meshgrid(np.arange(tile),np.arange(tile))
+    u=np.clip((xx-1)/(tile-3),0,1);v=np.clip((yy-1)/(tile-3),0,1)
+    barycentric=np.maximum(np.stack([1-u-v,u,v],axis=-1),0)
+    barycentric/=barycentric.sum(axis=-1,keepdims=True)
+    for i, face in enumerate(mesh.faces):
+        tx, ty = (i % side)*tile, (i // side)*tile
+        atlas[ty:ty+tile,tx:tx+tile] = (barycentric @ colors[face]).astype(np.uint8)
+        uv[3*i:3*i+3] = [(np.array([tx+x+.5, side*tile-ty-y-.5])/(side*tile))
+                           for x,y in ((1,1),(tile-2,1),(1,tile-2))]
+    texture = destination.with_suffix('.png')
+    Image.fromarray(atlas).save(texture)
+    with destination.open('w') as out:
+        for face in mesh.faces:
+            for vid in face:
+                v = normalized[vid]; c = colors[vid]/255
+                out.write('v '+' '.join(f'{x:.9g}' for x in [*v,*c])+'\n')
+        for u,v in uv:
+            out.write(f'vt {u:.9g} {v:.9g}\n')
+        for i in range(count):
+            ids = [3*i+j+1 for j in range(3)]
+            out.write('f '+' '.join(f'{j}/{j}' for j in ids)+'\n')
+    # Decompose at uniform scale; nonuniform normalization is applied afterward.
+    coacd.set_log_level('warn')
+    uniform = max(size)
+    parts = coacd.run_coacd(coacd.Mesh((mesh.vertices-center)/uniform, mesh.faces.astype(np.int32)),
+                           threshold=.06, max_convex_hull=12, resolution=1500,
+                           mcts_nodes=12, mcts_iterations=60, seed=42)
+    if not parts:
+        raise ValueError('碰撞分解未返回有效凸体')
+    collision = []
+    for i,(vertices,faces) in enumerate(parts):
+        path = destination.with_name(destination.stem+f'_collision_{i:02d}.obj')
+        trimesh.Trimesh(np.asarray(vertices)*uniform/size, faces, process=False).export(path)
+        collision.append(path)
+    return {'size':size.tolist(), 'center':center.tolist(), 'texture':texture,
+            'collision':collision, 'faces':count, 'collision_method':'CoACD convex decomposition',
+            'collision_parts':len(parts), 'appearance':'generated vertex colors baked into triangle atlas'}

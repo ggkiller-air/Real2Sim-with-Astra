@@ -1,37 +1,182 @@
 {
   "date": "2026-10-23",
-  "stage": "mujoco_rigid_v0.1",
-  "core_tests_passed": 8,
+  "stage": "mujoco_rigid_v0.2",
+  "core_tests_passed": 16,
+  "input": {
+    "type": "single_rgb",
+    "file": "image_external_2_rgb.jpg",
+    "sha256": "3fa8a82c8a6f033e687dd20a7e93f58bdf1044646f2f29f3ac617637db416bb8",
+    "depth_or_other_views_used": false
+  },
   "sam3": {
-    "actual_text_inference": true,
-    "candidate_count": 11,
-    "actual_box_positive_negative_refinement": true,
-    "installed_package": "0.1.4"
+    "actual_auto_text_inference": true,
+    "actual_gui_positive_negative_point_preview_and_confirm": true,
+    "hammer_confidence": 0.86328125,
+    "hammer_existing_id_preserved": true,
+    "point_preview_job": "09732ddf47c640c0",
+    "selected_count": 5,
+    "robot_asset_count": 0
   },
   "sam3d": {
-    "actual_inference": false,
-    "blocked_by": "official gated weights; host VRAM also below documented requirement"
+    "actual_inference": true,
+    "backend": "official SAM 3D Objects",
+    "weight_source": "ModelScope facebook/sam-3d-objects",
+    "main_weight_sha256_verified": true,
+    "runtime": "Python 3.11 / Torch 2.5.1 CUDA 12.1 / RTX 4090 24 GB",
+    "generated_colored_meshes": 5,
+    "convex_collision_parts": 45,
+    "textures": 5,
+    "job": "028f66b981234eff",
+    "shared_predicted_depth_and_table_fit": true,
+    "metric_scale": "assumed table width, not measured"
   },
   "ui_checks": [
-    "project selection",
-    "candidate deselection",
-    "special annotation save",
-    "proxy generation",
-    "native physics validation"
+    "existing single-image project loading",
+    "checkbox object selection and attributes",
+    "positive/negative point selection preview and confirmation",
+    "real mesh generation button",
+    "3D preview",
+    "native validation and Astra report",
+    "asset ZIP download"
   ],
-  "mujoco_proxy_smoke": {
+  "astra": {
+    "actual_multimodal_call": true,
+    "model": "gpt-6-astra",
+    "job": "86499e3e4b5d496a",
+    "pose_accepted": true,
+    "layout_accepted": true,
+    "mean_visible_silhouette_iou_before": 0.5802145176847009,
+    "mean_visible_silhouette_iou_after": 0.6891965945413085,
+    "per_object_after": {
+      "available": true,
+      "objects": [
+        {
+          "id": "o_020adfffb7e8",
+          "iou": 0.816318246397402,
+          "rendered_pixels": 4469,
+          "reference_pixels": 4480,
+          "rendered_centroid": [
+            587.7082121279929,
+            389.5759677780264
+          ],
+          "reference_centroid": [
+            591.0142857142857,
+            393.18035714285713
+          ]
+        },
+        {
+          "id": "o_a7cf06ff0eca",
+          "iou": 0.24454740648660866,
+          "rendered_pixels": 5106,
+          "reference_pixels": 5907,
+          "rendered_centroid": [
+            305.26028202115157,
+            381.6192714453584
+          ],
+          "reference_centroid": [
+            273.34281361097004,
+            357.77890638225836
+          ]
+        },
+        {
+          "id": "o_06fbe3ef93fa",
+          "iou": 0.8022110069694784,
+          "rendered_pixels": 3758,
+          "reference_pixels": 3741,
+          "rendered_centroid": [
+            318.7767429483768,
+            420.4709952102182
+          ],
+          "reference_centroid": [
+            310.17882919005615,
+            420.8417535418337
+          ]
+        },
+        {
+          "id": "o_c887f678eb0f",
+          "iou": 0.779313824419778,
+          "rendered_pixels": 9143,
+          "reference_pixels": 8490,
+          "rendered_centroid": [
+            474.9165481789347,
+            385.02034343213387
+          ],
+          "reference_centroid": [
+            482.136160188457,
+            389.87903415783273
+          ]
+        },
+        {
+          "id": "o_542c600bbda4",
+          "iou": 0.8035924884332759,
+          "rendered_pixels": 10821,
+          "reference_pixels": 9060,
+          "rendered_centroid": [
+            168.68690509195085,
+            410.46520654283336
+          ],
+          "reference_centroid": [
+            173.26865342163356,
+            408.7762693156733
+          ]
+        }
+      ],
+      "mean_iou": 0.6891965945413085,
+      "limitation": "Visible silhouette only; excludes RGB appearance, hidden geometry and metric accuracy."
+    },
+    "visual_judgment": "partial",
+    "note": "Assessment is model opinion on the pre-proposal views; accepted proposals are subsequently checked by native silhouette metrics and physics. IoU is against SAM3 masks, not ground-truth 3D."
+  },
+  "mujoco_native_audit": {
     "mujoco_version": "3.17.0",
-    "simulated_seconds": 2.999999999999891,
-    "contact_samples": 1500,
+    "simulated_seconds": 10.000000000000009,
+    "contact_samples": 5000,
+    "expected_steps": 5000,
     "physics_check_pass": true,
-    "initial_max_penetration_m": 0.0,
-    "warnings": []
+    "finite": true,
+    "initial_max_penetration_m": 0.0004953612637752967,
+    "max_penetration_m": 0.0007614897999246227,
+    "thresholds": {
+      "initial_penetration_m": 0.002,
+      "drift_m": 0.01,
+      "rotation_deg": 10,
+      "speed_m_s": 0.02,
+      "angular_speed_rad_s": 0.2
+    },
+    "warnings": [],
+    "maximum_translation_m": 0.001605479607630151,
+    "all_expected_table_contacts": true
   },
   "qualification": {
-    "image_to_3d_end_to_end": false,
-    "visual_match": false,
-    "real_physical_parameters": false,
-    "articulated_or_soft_objects": false
+    "image_to_real_mesh_mujoco_end_to_end": true,
+    "high_fidelity_visual_match": false,
+    "real_measured_physical_parameters": false,
+    "articulated_or_soft_objects": false,
+    "grasp_or_task_success": false,
+    "clean_second_machine_install": false
   },
-  "local_evidence": "runs/9c32e5d9a3554b9f/ (not committed; includes source image and failed attempts)"
+  "limitations": [
+    "Hammer remains poorly matched (visible silhouette IoU about 0.245).",
+    "Brush is cropped in the reference; unseen geometry and textures are inferred.",
+    "Mass/friction and global metric scale are assumptions; each default mass is 0.1 kg.",
+    "All assets are ordinary rigid bodies.",
+    "Astra requires authenticated Codex service and receives the reference/rendered images."
+  ],
+  "local_evidence": {
+    "project": "runs/8fb4afb273cb4793",
+    "revision": 34,
+    "native_audit": "jobs/final_native_audit/",
+    "failed_contact_optimization": "jobs/9e8b7c4008704b15/",
+    "failed_pose_candidates_preserved": true,
+    "test_log": "runs/core-tests.log",
+    "final_comparison_capture": "jobs/8d22695eee9841c3/",
+    "ui_revision_after_capture": 35
+  },
+  "deliverable_verification": {
+    "zip_extracted_and_native_loaded": true,
+    "free_bodies": 5,
+    "collision_parts": 45,
+    "textures": 5,
+    "local_evidence": "runs/deliverable_check.json"
+  }
 }

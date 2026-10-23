@@ -22,7 +22,12 @@ class SegmentRequest(Record):
     box: list[float] | None = None
     points: list[list[float]] = Field(default_factory=list, max_length=50)
     object_id: str | None = None
+    preview: bool = False
     label: str = Field(default="选中物体", max_length=100)
+
+
+class SelectionAcceptRequest(Record):
+    revision: int
 
 
 class ActionRequest(Record):
@@ -81,9 +86,11 @@ def create_app(root=None):
                 revision = scene.revision
                 operation(scene, folder)
                 # Any geometry/layout change invalidates earlier validation/export.
-                if kind not in ("validate", "export"):
+                if kind not in ("validate", "export", "capture", "review", "selection_preview"):
                     scene.reports.pop("validation", None)
                     scene.reports.pop("export", None)
+                    scene.reports.pop("views",None)
+                    scene.reports.pop("astra_review",None)
                 store.save(scene, expected=revision)
                 job["state"] = "done"
             except Exception as exc:
@@ -129,7 +136,7 @@ def create_app(root=None):
                 raise ValueError("此接口仅编辑现有物体；取消勾选可排除物体")
             for obj in scene.objects:
                 old = original_items[obj.id]
-                if (obj.mesh, obj.mask, obj.geometry, obj.bbox) != (old.mesh, old.mask, old.geometry, old.bbox):
+                if any(getattr(obj,k)!=getattr(old,k) for k in ("mesh","mask","geometry","bbox","visual_texture","collision_meshes","reconstruction")):
                     raise ValueError("几何与分割请使用专用操作修改")
             geometry.homography(scene.table, scene.image_size)
             scene.reports = {}  # previous artifacts remain in run history, but are stale
@@ -143,7 +150,12 @@ def create_app(root=None):
     def job(jid: str):
         if jid not in jobs:
             raise HTTPException(404, "任务不在当前服务中；重启前的记录保存在项目 jobs 目录")
-        return dict(jobs[jid])
+        value=dict(jobs[jid])
+        progress=store.path(value['scene_id'])/'jobs'/jid/'progress.json'
+        if progress.is_file():
+            try:value['progress']=json.loads(progress.read_text())
+            except (ValueError,OSError):pass
+        return value
 
     @app.post("/api/projects/{sid}/segment")
     def segment(sid: str, req: SegmentRequest):
@@ -171,6 +183,12 @@ def create_app(root=None):
                 request["labels"] = AUTO_LABELS
             request["exclusion_masks"] = [str(store.asset(sid, scene.preprocessing["exclusion_mask"]))] if scene.preprocessing.get("exclusion_mask") else []
             result = adapters.run_worker("sam3", request, folder)
+            if req.preview:
+                if not result["objects"]:
+                    raise ValueError("未找到有效物体，请增加正点或用负点排除机械臂/背景")
+                row = max(result["objects"], key=lambda r:r["score"])
+                scene.reports["selection_preview"] = dict(row, mask=str((folder/row["mask"]).relative_to(store.path(sid))), object_id=req.object_id)
+                return
             background = result.get("background", {})
             if background:
                 for key in ("exclusion_mask", "table_mask"):
@@ -196,11 +214,48 @@ def create_app(root=None):
                     # Imported meshes are independent; previously generated mesh would be stale.
                     if obj.geometry == "sam3d":
                         obj.geometry, obj.mesh = "none", None
+                        obj.visual_texture=None;obj.collision_meshes=[];obj.reconstruction={};obj.orientation=[1,0,0,0]
                 else:
                     scene.objects.append(ObjectRecord(id="o_"+uuid.uuid4().hex[:12], name=row["name"],
                                                       bbox=row["bbox"], score=row["score"], mask=mask))
             scene.reports["segmentation"] = {"backend": "official_sam3", "candidate_count": len(result["objects"]), "added_count": added, "job": folder.name}
-        return submit(sid, "segment", operation)
+        return submit(sid, "selection_preview" if req.preview else "segment", operation)
+
+    @app.delete("/api/projects/{sid}/selection/preview")
+    def discard_selection(sid: str, req: SelectionAcceptRequest):
+        with job_lock:
+            available(sid)
+            scene=store.load(sid)
+            if scene.revision!=req.revision:raise RuntimeError("项目已更新，请刷新后重试")
+            scene.reports.pop("selection_preview",None)
+            return store.save(scene,expected=req.revision)
+
+    @app.post("/api/projects/{sid}/selection/accept")
+    def accept_selection(sid: str, req: SelectionAcceptRequest):
+        with job_lock:
+            available(sid)
+            scene = store.load(sid)
+            if scene.revision != req.revision:
+                raise RuntimeError("项目已更新，请重新预览选择")
+            row = scene.reports.get("selection_preview")
+            if not row:
+                raise ValueError("请先预览分割结果")
+            obj = next((o for o in scene.objects if o.id == row.get("object_id")), None)
+            if obj is None:
+                mask = load_mask(store.asset(sid,row["mask"]))
+                obj = next((o for o in scene.objects if o.mask and duplicate(mask,[load_mask(store.asset(sid,o.mask))])), None)
+            if obj is None:
+                obj = ObjectRecord(id="o_"+uuid.uuid4().hex[:12],name=row["name"],bbox=row["bbox"])
+                scene.objects.append(obj)
+            elif obj.geometry == "sam3d":
+                obj.geometry, obj.mesh = "none", None
+                obj.visual_texture=None;obj.collision_meshes=[];obj.reconstruction={};obj.orientation=[1,0,0,0]
+            obj.mask, obj.bbox, obj.score = row["mask"], row["bbox"], row["score"]
+            obj.selected = True
+            if obj.support != "table" and not next(o for o in scene.objects if o.id == obj.support).selected:
+                obj.support = "table"
+            scene.reports = {}
+            return store.save(scene, expected=req.revision)
 
     @app.post("/api/projects/{sid}/region")
     def manual_region(sid: str, req: SegmentRequest):
@@ -237,6 +292,7 @@ def create_app(root=None):
             original = geometry.import_mesh(source, folder/"normalized.obj")
             obj.mesh = str((folder/"normalized.obj").relative_to(store.path(sid)))
             obj.geometry = "imported"
+            obj.visual_texture=None;obj.collision_meshes=[];obj.reconstruction={};obj.orientation=[1,0,0,0]
             # Preserve user-selected width; derive proportions, not metric scale.
             obj.size = [obj.size[0]*v/original[0] for v in original]
             ObjectRecord.model_validate(obj.model_dump())
@@ -245,7 +301,7 @@ def create_app(root=None):
 
     @app.post("/api/projects/{sid}/actions/{action}")
     def action(sid: str, action: str, req: ActionRequest):
-        if action not in ("proxy", "initialize", "optimize", "validate", "export", "reconstruct"):
+        if action not in ("proxy", "initialize", "optimize", "validate", "export", "reconstruct", "settle", "capture", "review"):
             raise HTTPException(404, "未知操作")
         if action == "reconstruct" and not adapters.status()["sam3d"]["configured"]:
             raise ValueError("SAM 3D Objects 尚无可用环境或权重；不会自动替换为占位模型")
@@ -263,20 +319,25 @@ def create_app(root=None):
             elif action == "optimize":
                 if any(o.selected and o.geometry == "none" for o in scene.objects):
                     raise ValueError("选中物体需要先具有几何")
-                scene.reports["optimization"] = geometry.optimize(scene)
+                scene.reports["optimization"] = (physics.optimize_contacts(scene,store.path(sid),folder/"contacts")
+                    if all(o.geometry=="sam3d" for o in scene.objects if o.selected) else geometry.optimize(scene))
+            elif action == "review":
+                from .review import review_and_refine
+                review_and_refine(scene,store.path(sid),folder)
+            elif action == "settle":
+                scene.reports["settling"]=physics.settle(scene,store.path(sid),folder/"settling")
+            elif action == "capture":
+                xml=physics.export_scene(scene,store.path(sid),folder/"simulation")
+                report=physics.capture_views(scene,xml,folder/"views",reference=store.path(sid)/scene.image)
+                report["path"]=str((folder/"views").relative_to(store.path(sid)))
+                scene.reports["views"]=report
             elif action == "reconstruct":
                 objects = [{"id": o.id, "mask": str(store.asset(sid, o.mask))} for o in scene.objects if o.selected and o.mask]
                 if len(objects) != sum(o.selected for o in scene.objects):
                     raise ValueError("所有选中物体都需要分割掩码")
                 result = adapters.run_worker("sam3d", {"image": str(store.asset(sid, scene.image)), "objects": objects, "seed": 42}, folder, timeout=3600)
-                for row in result["objects"]:
-                    obj = next(o for o in scene.objects if o.id == row["id"])
-                    dest = folder/(obj.id+".obj")
-                    original = geometry.import_mesh(folder/row["mesh"], dest)
-                    obj.mesh, obj.geometry = str(dest.relative_to(store.path(sid))), "sam3d"
-                    obj.size = [obj.size[0]*v/original[0] for v in original]
-                scene.reports["reconstruction"] = {"job": folder.name, "raw_layout_applied": False,
-                                                     "note": "原始模型姿态保存在 result.json；坐标变换尚未实模验证"}
+                from .reconstruction import assemble
+                assemble(scene,store.path(sid),folder,result)
             else:
                 output = folder/"simulation"
                 xml = physics.export_scene(scene, store.path(sid), output)
