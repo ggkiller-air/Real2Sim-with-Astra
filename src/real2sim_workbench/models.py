@@ -47,6 +47,7 @@ class ObjectRecord(Record):
 class TableRecord(Record):
     width: float = Field(default=1.2, gt=.05, le=10)
     depth: float = Field(default=.8, gt=.05, le=10)
+    center_xy: list[float] = Field(default_factory=lambda:[0.,0.], min_length=2, max_length=2)
     # Clockwise: far-left, far-right, near-right, near-left.
     corners: list[list[float]] = Field(default_factory=list)
     calibration_source: Literal["assumed", "user"] = "assumed"

@@ -42,3 +42,13 @@ ModelScope 主文件 21 个、共 13,105,863,596 字节，全部通过该来源 
 ## 第一版降级方式
 
 导入现有 OBJ/GLB/STL/PLY 网格，或显式生成占位盒以检查交互、布局和导出流程。不会在 SAM 3D 失败时自动换成占位几何，也不会把占位几何标记为模型重建。
+
+## 终端 SOCKS 代理兼容
+
+模型子进程把桌面终端常见的 `socks://` 别名规范化为 `socks5://`，保留地址、认证和 `NO_PROXY`，不修改父终端或关闭代理。SAM 3D 隔离依赖锁定 `socksio==1.0.0`（HTTPX/Gradio）及 `PySocks==1.7.1`（Requests）。若已有旧环境缺少它们，仅补装：
+
+```bash
+uv pip install --python .venv-sam3d/bin/python socksio==1.0.0 PySocks==1.7.1
+```
+
+该规范化只兼容 SOCKS5 服务的别名写法；明确的 `socks4://`、`socks5://`、`socks5h://` 和 HTTP 代理保持原样。它不证明代理服务连通或模型账号可用。

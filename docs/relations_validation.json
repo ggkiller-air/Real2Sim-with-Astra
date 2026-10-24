@@ -1,0 +1,33 @@
+{
+  "date": "2026-10-24",
+  "case": "single-image shelf, two cups, drawer",
+  "source_revision": 18,
+  "final_revision": 19,
+  "actual_astra_called": true,
+  "first_plan_reused_for_solver_retry": true,
+  "model": "gpt-6-astra",
+  "assets_rebuilt": false,
+  "mass_friction_geometry_unchanged": true,
+  "accepted": true,
+  "baseline_mean_iou": 0.18184966365871433,
+  "final_mean_iou": 0.7119713590618105,
+  "physics_check_pass": true,
+  "seconds": 10.000000000000009,
+  "steps": 5000,
+  "initial_max_penetration_m": 0.0006541867156208757,
+  "expected_support_contacts": {
+    "o_e612a3965ce8": true,
+    "o_52bfb98ea67b": true,
+    "o_3ddb6b49a9c4": true,
+    "o_80f670f586d3": true
+  },
+  "local_evidence": "runs/2a3936717f5044e1/jobs/relations_auto_v2",
+  "failed_prior_evidence": "runs/2a3936717f5044e1/jobs/relations_auto_v1",
+  "test_suite": "58 passed; FastAPI/httpx deprecation warning",
+  "limitations": [
+    "Final Astra visual match partial; grey cup colors and drawer/shelf geometry still differ.",
+    "Ordinary rigid drawer only, no prismatic joint.",
+    "No RGB-D end-to-end model rerun in this change; depth regression gate unit-tested.",
+    "Native 10 s stability does not prove physical property accuracy or manipulation success."
+  ]
+}

@@ -22,7 +22,7 @@ bash scripts/build.sh examples/rgbd_tabletop/capture \
 .venv/bin/real2sim view runs/<id>/mujoco/scene.xml
 ```
 
-`selection.json` 是原始主 RGB 图中的点击坐标和对象名称，选择六个 SAM3 实例：锤子、刷子、胡萝卜、苹果、绿按钮盒、红按钮盒。它不指定 3D 位置。省略选择文件会自动选择去重后的候选；自动识别不保证正确类别或完整覆盖。Astra 资产精修是可选项，目前对锤子、按钮盒使用参数化模板。其他物体仍使用 SAM 3D 网格。
+`selection.json` 是原始主 RGB 图中的点击坐标和对象名称，选择六个 SAM3 实例：锤子、刷子、胡萝卜、苹果、绿按钮盒、红按钮盒。它不指定 3D 位置。省略选择文件会自动选择去重后的候选；自动识别不保证正确类别或完整覆盖。当前固定工作流默认让所有选中资产经过 Astra 审查：锤子/按钮盒可参数化重建，其他物体可做轻度保形清理或明确保留。旧 `--refine-assets` 参数仍兼容；显式跳过用 `--skip-asset-review`，结果会标为未审查。最终原生视角还会进入 Astra 只读复核。完整方法见 [workflow-v0](../../docs/workflow-v0.md)。
 
 ## 深度怎样使用
 

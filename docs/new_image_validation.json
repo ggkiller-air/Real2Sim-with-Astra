@@ -1,0 +1,96 @@
+{
+  "date": "2026-10-24",
+  "scope": "new single-image end-to-end test; no reused SAM3D assets",
+  "project": "runs/bfedc223ba8e4077",
+  "input_size": [
+    1440,
+    1080
+  ],
+  "normalized_input_sha256": "ed19d03ea842cc9e9da20869a680be05aa7db32f1e77765ba3547c09a61beb63",
+  "method_version": "rigid_v0.4",
+  "input_image_committed": false,
+  "execution": {
+    "upload": "actual HTTP multipart upload using same GUI upload endpoint",
+    "segmentation": "official SAM3 auto",
+    "automatic_candidates": 4,
+    "selection": "one deletion through GUI: occluded plush held by excluded robot; three tabletop objects retained",
+    "robot_and_cable_selected": false,
+    "generation": "GUI MuJoCo button -> actual SAM3D -> actual Astra asset/refinement/layout/final review; then GUI Isaac button reuses unchanged reviewed scene",
+    "asset_decisions": {
+      "o_ba9542409868": "button_box",
+      "o_cd5e682804c5": "button_box",
+      "o_882c897396d3": "keep"
+    },
+    "native_previews": {
+      "mujoco": "ready; actual GUI button",
+      "isaac": "ready; actual GUI button"
+    }
+  },
+  "mujoco": {
+    "path": "jobs/dfb1467625b24b12/simulation",
+    "physics_check_pass": true,
+    "seconds": 10.000000000000009,
+    "steps": 5000,
+    "initial_max_penetration_m": 9.342795161180305e-05,
+    "max_drift_m": 4.611405299767357e-06,
+    "all_expected_support_contacts": true
+  },
+  "visual": {
+    "render_size": [
+      1440,
+      1080
+    ],
+    "baseline_mean_iou": 0.7839576365425183,
+    "final_mean_iou": 0.8148798825856988,
+    "astra_visual_match": "partial",
+    "workflow_quality": {
+      "status": "needs_review",
+      "physics_check_pass": true,
+      "all_selected_assets_reviewed": true,
+      "unreviewed_ids": [],
+      "unresolved_kept_ids": [],
+      "flags": [
+        "astra_visual_review_required"
+      ],
+      "asset_candidates_independently_validated": false,
+      "note": "Astra proposals and aggregate scene checks are not per-asset fidelity qualification."
+    },
+    "remaining": [
+      "Tray rim appears too thick and projected opening too round.",
+      "Button-box relative heights differ from the reference; geometry/camera ambiguity remains."
+    ]
+  },
+  "isaac": {
+    "path": "jobs/eea4f18cbce947bb/isaac",
+    "dynamics_check_pass": true,
+    "physics_check_pass": null,
+    "initial_penetration_check": "not_measured_in_physx",
+    "seconds": 10.0,
+    "steps": 5000,
+    "max_drift_m": 0.0004407504457049072,
+    "all_expected_support_contacts": true
+  },
+  "regression": {
+    "passed": 64,
+    "warnings": [
+      "Starlette TestClient/httpx deprecation"
+    ],
+    "fix": "Stubbed relational model call in orchestration unit test; test suite now completes without external model requests."
+  },
+  "release": {
+    "accepted_by_user": true,
+    "target_tag": "v0",
+    "scope": "Functional first version with explicitly accepted visual approximations; quality flags remain unchanged.",
+    "publication_status": "See Git remote/tag state; this report records validation, not network publication."
+  },
+  "limitations": [
+    "Single image, assumed absolute scale; masses/friction not measured.",
+    "Buttons exported as rigid assets, no functional button joints.",
+    "No clean-machine install or fresh RGB-D full-model run in this test."
+  ],
+  "evidence": {
+    "gui": "outputs/new_image_v0/gui.png",
+    "views": "runs/bfedc223ba8e4077/jobs/dfb1467625b24b12/simulation/evidence/views/views.png",
+    "isaac_preview": "runs/bfedc223ba8e4077/jobs/eea4f18cbce947bb/isaac/preview.png"
+  }
+}

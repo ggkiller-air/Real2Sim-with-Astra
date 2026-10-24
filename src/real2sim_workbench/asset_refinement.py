@@ -20,11 +20,12 @@ PARAMS = {
     'cap_height':(.025,.15), 'stem_diameter':(.15,.45),
 }
 SCHEMA={'type':'object','properties':{'assets':{'type':'array','items':{'type':'object','properties':{
-    'id':{'type':'string'},'template':{'type':'string','enum':['hammer','button_box','keep']},
+    'id':{'type':'string'},'template':{'type':'string','enum':['hammer','button_box','mesh_cleanup','keep']},
+    'review_status':{'type':'string','enum':['acceptable','needs_repair']},
     'assessment':{'type':'string'},'button_color':{'type':'string','enum':['red','green','none']},
     'parameters':{'type':'object','properties':{k:{'type':'number'} for k in PARAMS},'required':list(PARAMS),'additionalProperties':False},
     'limitations':{'type':'array','items':{'type':'string'}}},
-    'required':['id','template','assessment','button_color','parameters','limitations'],'additionalProperties':False}}},
+    'required':['id','template','review_status','assessment','button_color','parameters','limitations'],'additionalProperties':False}}},
     'required':['assets'],'additionalProperties':False}
 
 
@@ -108,13 +109,37 @@ def check_recipes(answer,ids):
     rows=answer['assets']
     if len(rows)!=len(ids) or {r['id'] for r in rows}!=set(ids):raise ValueError('Astra asset IDs must match the request exactly')
     for row in rows:
-        if row['template'] not in ('hammer','button_box','keep'):raise ValueError('Unknown asset template')
+        if row['template'] not in ('hammer','button_box','mesh_cleanup','keep'):raise ValueError('Unknown asset template')
+        if row.get('review_status','unassessed') not in ('acceptable','needs_repair','unassessed'):raise ValueError('Invalid review status')
         for key,(low,high) in PARAMS.items():
             value=row['parameters'][key]
             if not math.isfinite(value) or not low<=value<=high:raise ValueError('Out of bounds asset parameter: '+key)
         if row['template']=='button_box' and row['parameters']['housing_height']+row['parameters']['cap_height']>=.98:raise ValueError('Button stem height must remain positive')
         if row['template']=='button_box' and row['button_color'] not in ('red','green'):raise ValueError('Button color is required')
     return rows
+
+
+def clean_mesh(mesh):
+    """Bounded topology-preserving smoothing, without deleting small components.
+
+    Weld duplicated export vertices so smoothing reaches shared faces. Retain
+    sampled vertex appearance; the normal exporter rebakes it into a texture.
+    This cannot repair semantic shape, holes, missing bristles or wrong colors.
+    """
+    mesh=mesh.copy()
+    colors=mesh.visual.to_color() if hasattr(mesh.visual,'to_color') else mesh.visual
+    mesh.visual=trimesh.visual.ColorVisuals(mesh,vertex_colors=colors.vertex_colors.copy())
+    mesh.merge_vertices(merge_tex=True,merge_norm=True)
+    original=mesh.vertices.copy()
+    limit=float(np.linalg.norm(mesh.extents)*.01)
+    trimesh.smoothing.filter_taubin(mesh,lamb=.4,nu=.5,iterations=4)
+    displacement=mesh.vertices-original
+    length=np.linalg.norm(displacement,axis=1)
+    mesh.vertices=original+displacement*np.minimum(1,limit/np.maximum(length,1e-12))[:,None]
+    if not np.isfinite(mesh.vertices).all():raise ValueError('Non-finite cleaned mesh')
+    return mesh,{'method':'bounded_taubin','iterations':4,'displacement_limit_m':limit,
+                 'max_displacement_m':float(np.linalg.norm(mesh.vertices-original,axis=1).max()),
+                 'components_removed':0,'semantic_repair':False}
 
 
 def render_asset(xml_path,output,extent):
@@ -156,7 +181,7 @@ def refine_assets(scene,project,output,object_ids=None,reuse_plan=None):
         crop=image.crop(tuple(map(int,obj.bbox)));crop=ImageOps.contain(crop,(420,340),Image.Resampling.LANCZOS);canvas=Image.new('RGB',(480,400),'#eeeeee');canvas.paste(crop,((480-crop.width)//2,(400-crop.height)//2));canvas.save(folder/'reference.png')
         xml=asset_xml(project/obj.mesh,project/obj.visual_texture,obj.size,transform,folder/'before.xml')
         before_views[obj.id]=render_asset(xml,folder/'before',extents)
-        contexts.append({'id':obj.id,'name':obj.name,'canonical_extents_m':extents.tolist(),'bbox':obj.bbox})
+        contexts.append({'id':obj.id,'name':obj.name,'canonical_extents_m':extents.tolist(),'bbox':obj.bbox,'dimension_source':obj.reconstruction.get('dimension_source','assumed_or_predicted'),'special_structure_annotation':getattr(obj,'structure',None)})
     # One actual model call plans all requested assets, with no arbitrary code execution.
     sheet=Image.new('RGB',(960,len(objects)*430),'#eeeeee');draw=ImageDraw.Draw(sheet)
     for i,obj in enumerate(objects):
@@ -176,9 +201,17 @@ def refine_assets(scene,project,output,object_ids=None,reuse_plan=None):
     for recipe in recipes:
         obj=next(o for o in objects if o.id==recipe['id']);folder=output/obj.id;transform,extents=frames[obj.id]
         if recipe['template']=='keep':
-            reports.append({'id':obj.id,'status':'kept','recipe':recipe});continue
-        mesh=build_template(recipe,extents)
-        if not np.isfinite(mesh.vertices).all() or not mesh.is_watertight:raise ValueError('Candidate components must be finite and watertight')
+            reports.append({'id':obj.id,'status':'kept','review_status':recipe.get('review_status','unassessed'),'recipe':recipe});continue
+        cleanup=None
+        if recipe['template']=='mesh_cleanup':
+            mesh=trimesh.load(project/obj.mesh,force='mesh',process=False)
+            mesh.vertices*=obj.size
+            mesh.apply_transform(transform)
+            mesh,cleanup=clean_mesh(mesh)
+        else:
+            mesh=build_template(recipe,extents)
+            if not mesh.is_watertight:raise ValueError('Template components must be watertight')
+        if not np.isfinite(mesh.vertices).all():raise ValueError('Candidate must be finite')
         mesh.export(folder/'optimized.glb')
         # Return to the original SAM asset frame; downstream pose/size conventions stay the same.
         object_mesh=mesh.copy();object_mesh.apply_transform(np.linalg.inv(transform))
@@ -189,13 +222,13 @@ def refine_assets(scene,project,output,object_ids=None,reuse_plan=None):
         comparison=Image.new('RGB',(1440,1230),'#eeeeee');draw=ImageDraw.Draw(comparison)
         for i,name in enumerate(['front','overview','rear']):
             comparison.paste(Image.open(folder/'reference.png'),(0,30+i*400));comparison.paste(Image.open(before_views[obj.id][i]),(480,30+i*400));comparison.paste(Image.open(after[i]),(960,30+i*400))
-        for x,label in [(10,'Reference crop'),(490,'SAM 3D original'),(970,'Astra parametric candidate')]:draw.text((x,8),label,fill='black')
+        for x,label in [(10,'Reference crop'),(490,'SAM 3D original'),(970,'Astra-directed candidate')]:draw.text((x,8),label,fill='black')
         comparison.save(folder/'comparison.png')
         before_mesh=trimesh.load(project/obj.mesh,force='mesh',process=False)
-        report={'id':obj.id,'status':'candidate_only','recipe':recipe,'before_faces':len(before_mesh.faces),'after_faces':len(mesh.faces),'finite':True,'component_surfaces_watertight':bool(mesh.is_watertight),
+        report={'id':obj.id,'status':'candidate_only','review_status':recipe.get('review_status','unassessed'),'cleanup':cleanup,'recipe':recipe,'before_faces':len(before_mesh.faces),'after_faces':len(mesh.faces),'finite':True,'component_surfaces_watertight':bool(mesh.is_watertight),
             'canonical_from_original_asset':transform.tolist(),'comparison':str((folder/'comparison.png').relative_to(project)),
             'candidate':{'mesh':str((folder/'optimized.obj').relative_to(project)),'visual_texture':str(prep['texture'].relative_to(project)),'collision_meshes':[str(p.relative_to(project)) for p in prep['collision']], 'size':prep['size'],'asset_center_offset':prep['center'],'canonical_glb':str((folder/'optimized.glb').relative_to(project))},
-            'limitations':['Parameterized approximation; dimensions remain single-image estimates.','Separate overlapping closed components; not a Boolean-unioned CAD solid.','No scene assembly, collision dynamics, or grasp qualification performed.']}
+            'limitations':['Candidate approximation; measured/predicted dimension provenance remains in the source scene.','Templates use overlapping closed components; cleanup preserves source topology and may retain open surfaces.','No scene assembly, collision dynamics, or grasp qualification performed.']}
         atomic_json(folder/'asset.json',report);reports.append(report)
     assert original_snapshot==[o.model_dump() for o in scene.objects]
     summary=Image.new('RGB',(1440,430*len(reports)),'#eeeeee');draw=ImageDraw.Draw(summary)

@@ -1,11 +1,14 @@
 import io
 import json
 import os
+import shlex
+import shutil
 import threading
 import uuid
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from typing import Literal
 from fastapi import FastAPI, File, UploadFile, HTTPException, Request
 from fastapi.responses import FileResponse, Response, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -30,19 +33,34 @@ class SelectionAcceptRequest(Record):
     revision: int
 
 
+class ImportRequest(Record):
+    kind: str
+    name: str
+
+
+class GenerateRequest(Record):
+    revision: int
+    target: Literal["mujoco","isaac"] = "mujoco"
+    seconds: float = Field(default=10, ge=.1, le=30)
+
+
 class ActionRequest(Record):
     seconds: float = Field(default=3, ge=.1, le=30)
     object_ids: list[str] | None = Field(default=None, max_length=20)
 
 
-def create_app(root=None):
+def create_app(root=None, input_root=None):
     store = Store(root or os.environ.get("R2S_DATA_DIR", "runs"))
+    from .inputs import InputLibrary
+    library = InputLibrary(input_root or os.environ.get("R2S_INPUT_DIR") or Path(__file__).resolve().parents[2]/"data")
     app = FastAPI(title="Real2Sim with Astra", version="0.1.0")
     app.state.store = store
     executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="r2s")
     job_lock = threading.RLock()
     jobs = {}
     busy = set()
+    from .previews import PreviewManager
+    previews=PreviewManager(store)
 
     @app.middleware("http")
     async def same_origin(request: Request, call_next):
@@ -68,7 +86,7 @@ def create_app(root=None):
         if sid in busy:
             raise RuntimeError("当前项目正在计算，完成后可继续编辑")
 
-    def submit(sid, kind, operation):
+    def submit(sid, kind, operation, manages_save=False):
         with job_lock:
             available(sid)
             jid = uuid.uuid4().hex[:16]
@@ -86,13 +104,14 @@ def create_app(root=None):
                 scene = store.load(sid)
                 revision = scene.revision
                 operation(scene, folder)
-                # Any geometry/layout change invalidates earlier validation/export.
-                if kind not in ("validate", "export", "capture", "review", "selection_preview", "asset_refine"):
-                    scene.reports.pop("validation", None)
-                    scene.reports.pop("export", None)
-                    scene.reports.pop("views",None)
-                    scene.reports.pop("astra_review",None)
-                store.save(scene, expected=revision)
+                if not manages_save:
+                    # Any geometry/layout change invalidates earlier validation/export.
+                    if kind not in ("validate", "export", "capture", "review", "selection_preview", "asset_refine"):
+                        scene.reports.pop("validation", None)
+                        scene.reports.pop("export", None)
+                        scene.reports.pop("views",None)
+                        scene.reports.pop("astra_review",None)
+                    store.save(scene, expected=revision)
                 job["state"] = "done"
             except Exception as exc:
                 job["state"] = "failed"
@@ -108,6 +127,20 @@ def create_app(root=None):
     def status():
         return adapters.status()
 
+    @app.get("/api/inputs")
+    def inputs():
+        return library.catalog()
+
+    @app.post("/api/inputs/import")
+    def import_input(req: ImportRequest):
+        from .pipeline import prepare_input
+        try:
+            source = library.resolve(req.kind, req.name)
+            _, scene = prepare_input(source, store.root)
+        except (KeyError, TypeError) as exc:
+            raise ValueError("采集元数据格式不完整，请参考 examples/rgbd_tabletop/capture") from exc
+        return scene
+
     @app.get("/api/projects")
     def projects():
         return [{"id": s.id, "name": s.name, "objects": len(s.objects)} for s in store.list()]
@@ -115,7 +148,13 @@ def create_app(root=None):
     @app.post("/api/projects")
     async def upload(file: UploadFile = File(...)):
         data = await file.read(25*1024*1024+1)
-        return store.create(data, Path(file.filename or "场景").stem)
+        scene = store.create(data, Path(file.filename or "场景").stem)
+        scene.preprocessing['input_path'] = 'single_image'
+        # Store the validated, normalized image; filenames cannot escape the library.
+        dest = library.root/'image'/(scene.id+'.png')
+        shutil.copy2(store.asset(scene.id, scene.image), dest)
+        scene.preprocessing['library_input'] = str(dest)
+        return store.save(scene)
 
     @app.get("/api/projects/{sid}")
     def get(sid: str):
@@ -181,7 +220,7 @@ def create_app(root=None):
             request = req.model_dump()
             request["image"] = str(store.asset(sid, scene.image))
             if req.mode == "auto":
-                request["labels"] = AUTO_LABELS
+                request["labels"] = AUTO_LABELS + ["carrot", "apple"]
             request["exclusion_masks"] = [str(store.asset(sid, scene.preprocessing["exclusion_mask"]))] if scene.preprocessing.get("exclusion_mask") else []
             result = adapters.run_worker("sam3", request, folder)
             if req.preview:
@@ -204,7 +243,11 @@ def create_app(root=None):
                     scene.preprocessing["table_mapping"] = "detected_mask_bounds_assumed_not_metric_calibration"
             existing_masks = [load_mask(store.asset(sid,o.mask)) for o in scene.objects if o.mask]
             added = 0
-            for row in result["objects"]:
+            rows = result["objects"]
+            if req.mode == "auto":
+                from .pipeline import select_rows
+                rows = select_rows(rows, folder)
+            for row in rows:
                 if not req.object_id and duplicate(load_mask(folder/row["mask"]), existing_masks):
                     continue
                 added += 1
@@ -300,6 +343,97 @@ def create_app(root=None):
             scene.reports = {}
             return store.save(scene, expected=scene.revision)
 
+    @app.post("/api/projects/{sid}/generate")
+    def generate(sid: str, req: GenerateRequest):
+        from .pipeline import generate_selected
+        with job_lock:
+            available(sid)
+            scene = store.load(sid)
+            if scene.revision != req.revision:
+                raise RuntimeError("项目已更新，请刷新后重试")
+            if not adapters.status()['sam3d']['configured']:
+                raise ValueError("SAM 3D 环境未配置；请完成模型设置后生成")
+            selected = [o for o in scene.objects if o.selected]
+            if not selected or any(not o.mask for o in selected):
+                raise ValueError("请先用 SAM3 分割并保留至少一个物体")
+            for obj in selected:store.asset(sid, obj.mask)
+            def operation(scene, folder):
+                def progress(stage):atomic_json(folder/'progress.json', {'stage':stage})
+                from .pipeline import generate_target
+                generate_target(store,scene,folder,target=req.target,seconds=req.seconds,progress=progress)
+            return submit(sid, 'generate', operation, manages_save=True)
+
+    @app.post("/api/projects/{sid}/recheck")
+    def recheck(sid: str, req: GenerateRequest):
+        from .pipeline import recheck_existing
+        with job_lock:
+            available(sid)
+            scene=store.load(sid)
+            if scene.revision!=req.revision:raise RuntimeError("项目已更新，请刷新后重试")
+            if not any(o.selected for o in scene.objects) or any(o.selected and o.geometry=='none' for o in scene.objects):
+                raise ValueError("请先生成资产；复检不会创建占位物体")
+            def operation(scene,folder):
+                recheck_existing(store,scene,folder,req.seconds,
+                                 progress=lambda stage:atomic_json(folder/'progress.json',{'stage':stage}))
+            return submit(sid,'recheck',operation,manages_save=True)
+
+    @app.post("/api/projects/{sid}/layout")
+    def auto_layout(sid: str, req: GenerateRequest):
+        from .pipeline import recheck_existing
+        with job_lock:
+            available(sid)
+            scene=store.load(sid)
+            if scene.revision!=req.revision:raise RuntimeError("项目已更新，请刷新后重试")
+            if not any(o.selected for o in scene.objects) or any(o.selected and o.geometry=='none' for o in scene.objects):
+                raise ValueError("请先生成资产；复检不会创建占位物体")
+            def operation(scene,folder):
+                recheck_existing(store,scene,folder,req.seconds,auto_layout=True,
+                                 progress=lambda stage:atomic_json(folder/'progress.json',{'stage':stage}))
+            return submit(sid,'layout',operation,manages_save=True)
+
+    @app.post("/api/projects/{sid}/table/fit")
+    def fit_table(sid: str, req: SelectionAcceptRequest):
+        import numpy as np
+        with job_lock:
+            available(sid)
+            scene=store.load(sid)
+            if scene.revision!=req.revision:raise RuntimeError("项目已更新，请刷新后重试")
+            chosen=[o for o in scene.objects if o.selected and o.geometry!='none']
+            if chosen:
+                lower=np.min([np.asarray(o.position[:2])-geometry.half_extent(o)[:2] for o in chosen],axis=0)-.06
+                upper=np.max([np.asarray(o.position[:2])+geometry.half_extent(o)[:2] for o in chosen],axis=0)+.06
+                scene.table.width,scene.table.depth=map(float,upper-lower)
+                scene.table.center_xy=((lower+upper)/2).tolist()
+            else:
+                scene.table.width,scene.table.depth=1.2,.8;scene.table.center_xy=[0.,0.]
+            scene.table.calibration_source='user'
+            scene.reports={}
+            return store.save(scene,expected=req.revision)
+
+    @app.get("/api/projects/{sid}/result")
+    def result(sid: str):
+        scene = store.load(sid)
+        exported = scene.reports.get('export')
+        xml = store.asset(sid, exported['path']+'/scene.xml') if exported else None
+        repo = Path(__file__).resolve().parents[2]
+        command = (f"cd {shlex.quote(str(repo))} && .venv/bin/python -m real2sim_workbench.cli view {shlex.quote(str(xml))}" if xml else None)
+        isaac=scene.reports.get('isaac')
+        usd=store.asset(sid,isaac['path']+'/scene.usdc') if isaac else None
+        return {'project':str(store.path(sid)), 'xml':str(xml) if xml else None,'usd':str(usd) if usd else None,
+                'view_command':command, 'reports':scene.reports}
+
+    @app.post("/api/projects/{sid}/preview/{engine}")
+    def preview(sid: str,engine: Literal['mujoco','isaac'],req: SelectionAcceptRequest):
+        with job_lock:
+            available(sid);scene=store.load(sid)
+            if scene.revision!=req.revision:raise RuntimeError('项目已更新，请刷新后重试')
+            return previews.launch(scene,engine)
+
+    @app.get("/api/projects/{sid}/preview/{engine}")
+    def preview_status(sid: str,engine: Literal['mujoco','isaac']):
+        store.path(sid)
+        return previews.status(sid,engine)
+
     @app.post("/api/projects/{sid}/actions/{action}")
     def action(sid: str, action: str, req: ActionRequest):
         if action not in ("proxy", "initialize", "optimize", "validate", "export", "reconstruct", "settle", "capture", "review", "asset_refine"):
@@ -339,7 +473,10 @@ def create_app(root=None):
                 objects = [{"id": o.id, "mask": str(store.asset(sid, o.mask))} for o in scene.objects if o.selected and o.mask]
                 if len(objects) != sum(o.selected for o in scene.objects):
                     raise ValueError("所有选中物体都需要分割掩码")
-                result = adapters.run_worker("sam3d", {"image": str(store.asset(sid, scene.image)), "objects": objects, "seed": 42}, folder, timeout=3600)
+                request = {"image": str(store.asset(sid, scene.image)), "objects": objects, "seed": 42}
+                if scene.preprocessing.get('depth_registration'):
+                    request['registered_depth'] = str(store.asset(sid, scene.preprocessing['depth_registration']))
+                result = adapters.run_worker("sam3d", request, folder, timeout=3600)
                 from .reconstruction import assemble
                 assemble(scene,store.path(sid),folder,result)
             else:

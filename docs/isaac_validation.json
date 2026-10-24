@@ -1,0 +1,56 @@
+{
+  "date": "2026-10-24",
+  "route": "shared_scene_direct_usd",
+  "runtime": "Isaac Sim 6.1.0 / PhysX CPU TGS",
+  "gui_generation_job": "d13b5c6f54ea4a8c",
+  "source_project": "runs/2a3936717f5044e1",
+  "isaac_output": "jobs/d13b5c6f54ea4a8c/isaac",
+  "dynamics_check_pass": true,
+  "physics_check_pass": null,
+  "simulated_seconds": 10.0,
+  "contact_samples": 5000,
+  "max_translation_m": 0.001058009802363813,
+  "all_expected_support_contacts": true,
+  "native_previews": [
+    {
+      "path": "runs/2a3936717f5044e1/jobs/preview_isaac_7b5effba",
+      "ready": {
+        "state": "ready",
+        "engine": "isaac",
+        "usd": "/home/yons/lst/DEXAGENT/real2sim-workbench/runs/2a3936717f5044e1/jobs/d13b5c6f54ea4a8c/isaac/scene.usdc"
+      },
+      "launch": {
+        "engine": "isaac",
+        "scene": "/home/yons/lst/DEXAGENT/real2sim-workbench/runs/2a3936717f5044e1/jobs/d13b5c6f54ea4a8c/isaac/scene.usdc",
+        "pid": 1422712
+      }
+    },
+    {
+      "path": "runs/2a3936717f5044e1/jobs/preview_mujoco_36d34083",
+      "ready": {
+        "state": "ready",
+        "engine": "mujoco",
+        "xml": "/home/yons/lst/DEXAGENT/real2sim-workbench/runs/2a3936717f5044e1/jobs/bbe1731342324310/simulation/scene.xml"
+      },
+      "launch": {
+        "engine": "mujoco",
+        "scene": "/home/yons/lst/DEXAGENT/real2sim-workbench/runs/2a3936717f5044e1/jobs/bbe1731342324310/simulation/scene.xml",
+        "pid": 1422711
+      }
+    }
+  ],
+  "route_probe": "outputs/isaac_route_probe/import.log",
+  "failed_runs_retained": [
+    "jobs/isaac_direct_v1",
+    "jobs/isaac_direct_v2"
+  ],
+  "gui_screenshot": "outputs/dual-target/gui.png",
+  "tests": "64 passed",
+  "limitations": [
+    "PhysX and MuJoCo contact solvers differ; results are checked separately.",
+    "Static/dynamic friction map to the MuJoCo sliding coefficient; torsional/rolling friction are not equivalent.",
+    "No native initial-penetration qualification in this worker; dynamics pass is not full physics qualification.",
+    "Special object types remain rigid annotations."
+  ],
+  "scope": "Reused existing reviewed single-image assets; no new SAM3/SAM3D/Astra inference and no new RGB-D end-to-end model run."
+}

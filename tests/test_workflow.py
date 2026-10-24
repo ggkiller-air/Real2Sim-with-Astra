@@ -99,7 +99,7 @@ def test_optimizer_preserves_mass_and_locked_pose(tmp_path):
 
 def test_api_real_export_mesh_import_and_stale_result(tmp_path,monkeypatch):
     monkeypatch.delenv('R2S_SAM3D_CONFIG',raising=False)
-    app=create_app(tmp_path/'runs')
+    app=create_app(tmp_path/'runs',input_root=tmp_path/'data')
     with TestClient(app) as client:
         assert client.get('/').status_code==200
         scene=client.post('/api/projects',files={'file':('photo.png',image_bytes(),'image/png')}).json()
@@ -139,7 +139,7 @@ def test_store_rejects_path_escape(tmp_path):
 
 
 def test_manual_region_without_models(tmp_path):
-    app=create_app(tmp_path/'runs')
+    app=create_app(tmp_path/'runs',input_root=tmp_path/'data')
     with TestClient(app) as client:
         scene=client.post('/api/projects',files={'file':('photo.png',image_bytes(),'image/png')}).json()
         path='/api/projects/'+scene['id']
@@ -177,7 +177,7 @@ def test_auto_segmentation_preserves_removed_objects_and_background(tmp_path,mon
         return {'objects':[{'name':'hammer','mask':'object.png','score':.9,'bbox':[200,300,240,340]}],
                 'background':{'exclusion_mask':'robot.png','table_bbox':[0,250,640,480]}}
     monkeypatch.setattr(adapters,'run_worker',worker)
-    with TestClient(create_app(tmp_path/'runs')) as client:
+    with TestClient(create_app(tmp_path/'runs',input_root=tmp_path/'data')) as client:
         s=client.post('/api/projects',files={'file':('photo.png',image_bytes())}).json()
         path='/api/projects/'+s['id']
         assert wait(client,client.post(path+'/segment',json={'mode':'auto'}).json())['state']=='done'
@@ -216,7 +216,7 @@ def test_point_preview_accept_and_stale_revision(tmp_path,monkeypatch):
         Image.fromarray(mask).save(folder/'mask.png')
         return {'objects':[{'name':'hammer','mask':'mask.png','score':.95,'bbox':[200,100,300,240]}]}
     monkeypatch.setattr(adapters,'run_worker',worker)
-    with TestClient(create_app(tmp_path/'runs')) as client:
+    with TestClient(create_app(tmp_path/'runs',input_root=tmp_path/'data')) as client:
         s=client.post('/api/projects',files={'file':('photo.png',image_bytes())}).json()
         path='/api/projects/'+s['id']
         job=client.post(path+'/segment',json={'mode':'instance','preview':True,'points':[[250,180,1],[400,80,0]]}).json()
@@ -330,7 +330,7 @@ def test_asset_only_action_preserves_active_geometry_and_scene_reports(tmp_path,
         assert ids==[scene.objects[0].id]
         candidate.reports['asset_refinement']={'stage':'asset_only','active_objects_unchanged':True}
     monkeypatch.setattr(asset_refinement,'refine_assets',refine)
-    with TestClient(create_app(store.root)) as client:
+    with TestClient(create_app(store.root,input_root=tmp_path/'data')) as client:
         job=client.post('/api/projects/'+scene.id+'/actions/asset_refine',json={'object_ids':[scene.objects[0].id]}).json()
         assert wait(client,job)['state']=='done'
     current=store.load(scene.id)

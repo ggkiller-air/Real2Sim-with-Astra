@@ -7,6 +7,7 @@ from pathlib import Path
 import numpy as np
 from .geometry import support_order
 from .store import atomic_json
+from . import rendering
 
 
 def numbers(values):
@@ -35,13 +36,14 @@ def export_scene(scene, folder, output):
     ET.SubElement(root, "compiler", angle="radian", meshdir="assets", texturedir="assets", autolimits="true")
     ET.SubElement(root, "option", timestep="0.002", gravity="0 0 -9.81", integrator="implicitfast", iterations="80", cone="elliptic")
     visual = ET.SubElement(root, "visual")
-    ET.SubElement(visual, "global", offwidth="960", offheight="720")
+    rw,rh=rendering.render_size(scene.image_size)
+    ET.SubElement(visual, "global", offwidth=str(max(960,rw)), offheight=str(max(720,rh)))
     ET.SubElement(visual,"headlight",ambient="0.35 0.35 0.35",diffuse="0.65 0.65 0.65",specular="0.1 0.1 0.1")
     asset = ET.SubElement(root, "asset")
     world = ET.SubElement(root, "worldbody")
     ET.SubElement(world, "light", pos="0 -1 3", dir="0 0 -1", diffuse="0.8 0.8 0.8")
     ET.SubElement(world, "geom", name="table", type="box", size=numbers([scene.table.width/2, scene.table.depth/2, .025]),
-                  pos="0 0 -0.025", rgba=numbers(scene.preprocessing.get("table_rgba",[.04,.43,.44,1])), friction="0.5 0.005 0.0001")
+                  pos=numbers([*scene.table.center_xy,-.025]), rgba=numbers(scene.preprocessing.get("table_rgba",[.04,.43,.44,1])), friction="0.5 0.005 0.0001")
     ET.SubElement(world, "geom", name="floor", type="plane", size="5 5 .1", pos="0 0 -0.8", rgba="0.16 0.19 0.22 1")
     camera=scene.preprocessing.get("camera")
     if camera:
@@ -210,19 +212,22 @@ def capture_views(scene,xml,output,reference=None):
     import os
     os.environ.setdefault('MUJOCO_GL','egl')
     import mujoco
-    from PIL import Image,ImageDraw
+    from PIL import Image,ImageDraw,ImageOps
     output=Path(output);output.mkdir(parents=True,exist_ok=True)
     model=mujoco.MjModel.from_xml_path(str(xml));data=mujoco.MjData(model);mujoco.mj_forward(model,data)
     renderer=mujoco.Renderer(model,height=480,width=640)
     option=mujoco.MjvOption();option.geomgroup[3]=0
     views=[]
     if reference is not None:
-        Image.open(reference).convert('RGB').resize((640,480)).save(output/'reference.png')
+        ImageOps.pad(Image.open(reference).convert('RGB'),(640,480),color='#e8ece7').save(output/'reference.png')
         views.append('reference.png')
     try:
         if scene.preprocessing.get('camera'):
-            renderer.update_scene(data,camera='source',scene_option=option)
-            path=output/'source_view.png';Image.fromarray(renderer.render()).save(path);views.append(path.name)
+            sw,sh=scene.image_size;scale=min(640/sw,480/sh);size=(max(1,round(sw*scale)),max(1,round(sh*scale)))
+            with rendering.renderer(model,size) as source_renderer:
+                source_renderer.update_scene(data,camera='source',scene_option=option)
+                picture=Image.fromarray(source_renderer.render())
+            path=output/'source_view.png';ImageOps.pad(picture,(640,480),color='#e8ece7').save(path);views.append(path.name)
         center=np.mean([o.position for o in scene.objects if o.selected],axis=0)
         distance=max(scene.table.width,scene.table.depth)*1.35
         for name,azimuth,elevation in [('overview',90,-35),('top',90,-89),('side',0,-15),('opposite',270,-25)]:
@@ -235,7 +240,7 @@ def capture_views(scene,xml,output,reference=None):
         x=(i%2)*640;y=(i//2)*510
         sheet.paste(Image.open(output/name),(x,y+30));draw.text((x+10,y+8),name,fill='black')
     sheet.save(output/'views.png')
-    report={'views':views,'contact_state':'initial exported pose','engine':'MuJoCo native renderer'}
+    report={'views':views,'contact_state':'initial exported pose','engine':'MuJoCo native renderer','source_image_size':scene.image_size,'reference_layout':'aspect preserved with identical letterboxing for reference and source view'}
     atomic_json(output/'views.json',report)
     return report
 
@@ -249,11 +254,11 @@ def silhouette_metrics(scene, project, xml):
     if not scene.preprocessing.get('camera'):return {'available':False}
     width,height=scene.image_size
     model=mujoco.MjModel.from_xml_path(str(xml));data=mujoco.MjData(model);mujoco.mj_forward(model,data)
-    renderer=mujoco.Renderer(model,height=height,width=width)
+    renderer=rendering.renderer(model,scene.image_size)
     option=mujoco.MjvOption();option.geomgroup[3]=0
     try:
         renderer.enable_segmentation_rendering();renderer.update_scene(data,camera='source',scene_option=option)
-        segmentation=renderer.render().copy()
+        segmentation=rendering.source_pixels(renderer.render(),scene.image_size)
     finally:renderer.close()
     rows=[]
     for obj in scene.objects:
@@ -269,7 +274,7 @@ def silhouette_metrics(scene, project, xml):
             return [float(xx.mean()),float(yy.mean())] if len(xx) else None
         rows.append({'id':obj.id,'iou':iou,'rendered_pixels':int(predicted.sum()),'reference_pixels':int(expected.sum()),
                      'rendered_centroid':centroid(predicted),'reference_centroid':centroid(expected)})
-    return {'available':True,'objects':rows,'mean_iou':float(np.mean([r['iou'] for r in rows])) if rows else 0.,
+    return {'available':True,'source_image_size':scene.image_size,'render_size':list(rendering.render_size(scene.image_size)),'centroid_coordinates':'source_image_pixels','objects':rows,'mean_iou':float(np.mean([r['iou'] for r in rows])) if rows else 0.,
             'limitation':'Visible silhouette only; excludes RGB appearance, hidden geometry and metric accuracy.'}
 
 
@@ -301,7 +306,7 @@ def optimize_contacts(scene,folder,output):
         loss+=10000*sum(max(0.,d-.0003)**2 for d in depths.values())
         for (_,obj),pos in zip(moving,xy):
             ext=half_extent(obj)[:2]
-            overflow=np.maximum(np.abs(pos)+ext-[scene.table.width/2,scene.table.depth/2],0)
+            overflow=np.maximum(np.abs(pos-np.asarray(scene.table.center_xy))+ext-[scene.table.width/2,scene.table.depth/2],0)
             loss+=10000*float(overflow@overflow)
         if loss<best[0]:best[:]=[loss,flat.copy(),max_depth]
         return loss

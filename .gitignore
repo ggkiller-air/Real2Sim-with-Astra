@@ -21,7 +21,13 @@ htmlcov/
 
 # Models, inputs and generated evidence
 /checkpoints/
-/data/
+/data/*
+!/data/image/
+!/data/depth/
+/data/image/*
+/data/depth/*
+!/data/image/.gitkeep
+!/data/depth/.gitkeep
 /outputs/
 /runs/
 /vendor/

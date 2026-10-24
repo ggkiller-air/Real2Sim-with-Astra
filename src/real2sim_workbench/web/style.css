@@ -534,3 +534,14 @@ dialog::backdrop {
     display: none;
   }
 }
+
+.input-panel {display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:14px 18px;margin-bottom:16px;}
+.input-panel label {display:flex;align-items:center;gap:10px;white-space:nowrap;}
+.input-panel #inputFile {flex:1;min-width:180px;max-width:100%;}
+.input-panel small {flex-basis:100%;overflow-wrap:anywhere;}
+.result-panel {padding:18px;margin-top:16px;}
+.result-panel h2 {margin:0;}
+#resultState {color:var(--muted);font-size:13px;}
+#resultOutput p {overflow-wrap:anywhere;font-family:monospace;font-size:12px;}
+#viewCommand {display:block;width:100%;box-sizing:border-box;margin:8px 0;padding:10px;border:1px solid #d9ddd5;border-radius:8px;background:#f7f8f4;resize:vertical;}
+.generation-bar,.preview-actions{display:grid;grid-template-columns:1fr 1fr;gap:12px}.generation-bar button,.preview-actions button{padding:14px 20px;font-size:15px}.result-panel details{margin-top:12px}.result-panel details textarea{width:100%}@media(max-width:560px){.generation-bar,.preview-actions{grid-template-columns:1fr}}

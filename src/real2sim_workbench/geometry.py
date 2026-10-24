@@ -36,6 +36,7 @@ def homography(table, image_size):
         raise ValueError("桌面四点需沿边界依次选择，不能交叉或共线")
     target = [[-table.width / 2, table.depth / 2], [table.width / 2, table.depth / 2],
               [table.width / 2, -table.depth / 2], [-table.width / 2, -table.depth / 2]]
+    target=np.asarray(target)+np.asarray(table.center_xy)
     a, b = [], []
     for (x, y), (u, v) in zip(corners, target):
         a.extend([[x, y, 1, 0, 0, 0, -u*x, -u*y], [0, 0, 0, x, y, 1, -v*x, -v*y]])
@@ -98,7 +99,7 @@ def optimize(scene):
         loss = float(np.square(values.reshape(-1, 2) - anchors).sum()) * .2
         for i, a in enumerate(objs):
             if a.support == "table":
-                overflow = np.maximum(np.abs(xy[a.id]) + ext[a.id][:2] - [scene.table.width/2, scene.table.depth/2], 0)
+                overflow = np.maximum(np.abs(xy[a.id]-np.asarray(scene.table.center_xy)) + ext[a.id][:2] - [scene.table.width/2, scene.table.depth/2], 0)
                 loss += float(overflow @ overflow) * 200
             elif a.support in items:
                 parent = items[a.support]

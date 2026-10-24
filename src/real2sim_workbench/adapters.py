@@ -45,6 +45,20 @@ def status():
     }
 
 
+def worker_environment(environ=None):
+    """Normalize the common desktop SOCKS alias for HTTPX/Requests.
+
+    Preserve proxy host, credentials and all other settings; never change the
+    parent shell or silently disable routing. Explicit SOCKS4/5 URLs stay intact.
+    """
+    env=dict(os.environ if environ is None else environ)
+    for key in ('HTTP_PROXY','HTTPS_PROXY','ALL_PROXY','http_proxy','https_proxy','all_proxy'):
+        value=env.get(key,'')
+        if value.lower().startswith('socks://'):
+            env[key]='socks5://'+value[len('socks://'):]
+    return env
+
+
 def run_worker(kind, request, folder, timeout=1200):
     s = settings()
     if not status()[kind]["configured"]:
@@ -60,9 +74,9 @@ def run_worker(kind, request, folder, timeout=1200):
     with (folder / "worker.log").open("w") as log:
         try:
             result = subprocess.run([interpreter, str(worker), str(request_file), str(result_file)],
-                                    stdout=log, stderr=subprocess.STDOUT, timeout=timeout, env=os.environ.copy())
+                                    stdout=log, stderr=subprocess.STDOUT, timeout=timeout, env=worker_environment())
         except subprocess.TimeoutExpired as exc:
-            raise RuntimeError(f"{kind} 超时，日志已保存") from exc
+            raise RuntimeError(f"{kind} 超时；日志：{folder / 'worker.log'}") from exc
     if result.returncode:
-        raise RuntimeError(f"{kind} 运行失败；查看 {folder.name}/worker.log")
+        raise RuntimeError(f"{kind} 运行失败；查看 {folder / 'worker.log'}")
     return json.loads(result_file.read_text())

@@ -78,8 +78,8 @@ const json = (method, value) => ({
 });
 function change() {
   dirty = true;
+  renderResult();
   $("saveState").textContent = "有未保存修改";
-  renderReport();
 }
 const current = () => scene?.objects.find((o) => o.id === selected);
 const fileURL = (path) => `/api/projects/${scene.id}/files/${path}`;
@@ -148,7 +148,7 @@ function rebuild3D() {
     new THREE.BoxGeometry(table.width, table.depth, 0.05),
     new THREE.MeshStandardMaterial({ color: "#147a7e", roughness: 0.9 }),
   );
-  tableMesh.position.z = -0.025;
+  tableMesh.position.set(...(table.center_xy || [0,0]),-.025);
   group.add(tableMesh);
   const grid = new THREE.GridHelper(2, 20, 0x91aa94, 0xd0d9cc);
   grid.rotation.x = Math.PI / 2;
@@ -641,75 +641,11 @@ $("undoRemove").onclick = async () => {
   await persist();
 };
 function renderProperties() {
-  const obj = current();
-  if (!obj) {
-    $("properties").innerHTML = "选择一个物体查看详情。";
-    return;
-  }
-  const input = (label, key, value, extra = "") =>
-    `<label>${label}<input data-key="${key}" value="${escape(value)}" ${extra}></label>`;
-  $("properties").innerHTML =
-    input("名称", "name", obj.name) +
-    `<div class="three-col">${["宽 / m", "深 / m", "高 / m"].map((label, i) => input(label, `size.${i}`, obj.size[i], 'type="number" min="0.001" max="10" step="0.01"')).join("")}</div>` +
-    `<div class="two-col">${input("质量 / kg", "mass", obj.mass, 'type="number" min="0.001" step="0.01"')}${input("摩擦系数", "friction", obj.friction, 'type="number" min="0" max="3" step="0.05"')}</div>` +
-    `<label class="button upload">导入已有模型<input id="meshFile" type="file" accept=".obj,.glb,.stl,.ply" hidden></label><p class="smallnote">${geometryLabels[obj.geometry]} · 默认尺寸与重量为估计值。特殊类型仅标注，当前按普通刚体处理。</p>`;
-  $("properties")
-    .querySelectorAll("[data-key]")
-    .forEach(
-      (field) =>
-        (field.onchange = async () => {
-          const key = field.dataset.key,
-            value = field.type === "number" ? Number(field.value) : field.value;
-          if (key.includes(".")) {
-            const [base, i] = key.split(".");
-            obj[base][+i] = value;
-          } else obj[key] = value;
-          if (key !== "name") obj.parameter_source = "user";
-          change();
-          await persist();
-        }),
-    );
-  $("meshFile").onchange = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setBusy(true);
-    try {
-      await save();
-      const form = new FormData();
-      form.append("file", file);
-      scene = await api(`/api/projects/${scene.id}/objects/${obj.id}/mesh`, {
-        method: "POST",
-        body: form,
-      });
-      render();
-      notice("模型已导入。");
-    } catch (error) {
-      notice(error.message, "error");
-    } finally {
-      setBusy(false);
-    }
-  };
-}
-function renderReport() {
-  $("showAssets").hidden=!scene?.objects.some(o=>o.selected && o.geometry==="sam3d");
-  $("showViews").hidden=!scene?.reports.views || dirty;
-  $("download").classList.toggle("disabled", !scene?.reports.export || dirty);
-  if (scene?.reports.export)
-    $("download").href = `/api/projects/${scene.id}/download`;
-  $("download").hidden = !scene?.reports.export || dirty;
-  $("showReport").hidden = !scene?.reports.validation || dirty;
-  const report = scene?.reports.validation;
-  if (dirty) {
-    $("report").innerHTML =
-      '<p class="muted">参数已修改，旧检查结果不适用于当前编辑。请保存后重新检查。</p>';
-    return;
-  }
-  if (!report) {
-    $("report").innerHTML = '<p class="muted">尚无当前版本的检查结果。</p>';
-    return;
-  }
-  $("report").innerHTML =
-    `<strong class="${report.physics_check_pass ? "status-pass" : "status-fail"}">${report.physics_check_pass ? "短时物理检查通过" : "物理检查发现问题"}</strong><div class="metric"><span>仿真时长</span><span>${report.simulated_seconds.toFixed(2)} s</span></div><div class="metric"><span>初始最大穿插</span><span>${(report.initial_max_penetration_m * 1000).toFixed(2)} mm</span></div><div class="metric"><span>最大位移</span><span>${(Math.max(0, ...report.objects.map((o) => o.translation_m)) * 1000).toFixed(1)} mm</span></div><ul>${report.objects.map((o) => `<li class="${o.stable ? "status-pass" : "status-fail"}">${escape(o.name)} · ${(o.translation_m * 1000).toFixed(1)} mm · ${o.expected_support_contact ? "支撑接触存在" : "未保持预期支撑"}</li>`).join("")}</ul><p class="smallnote">仅验证当前刚体近似。视觉一致性未验证，不代表真实物理属性或任务成功。</p>`;
+  const obj=current();
+  if(!obj){$('properties').innerHTML='';return;}
+  $('properties').innerHTML=`<label>名称<input id="objectName" value="${escape(obj.name)}"></label><label>质量 / kg<input id="objectMass" type="number" min="0.001" step="0.01" value="${obj.mass}"></label>`;
+  $('objectName').onchange=async(e)=>{obj.name=e.target.value;change();await persist();};
+  $('objectMass').onchange=async(e)=>{const value=Number(e.target.value);if(!(value>0 && value<=1000))return notice('请输入有效质量','error');obj.mass=value;obj.parameter_source='user';change();await persist();};
 }
 function render() {
   $("sceneTitle").textContent = scene.name;
@@ -718,7 +654,7 @@ function render() {
 
   renderObjects();
   renderProperties();
-  renderReport();
+  renderResult();
   rebuild3D();
   draw();
   setBusy(busy);
@@ -800,13 +736,18 @@ function setBusy(value) {
   $("autoDetect").disabled = value || !scene || !modelStatus.sam3?.configured;
   $("newSelection").disabled = value || !scene;
   $("pointSelection").disabled = value || !scene || !modelStatus.sam3?.configured;
-  $("buildScene").disabled = value || !scene?.objects.some((o) => o.selected);
-  $("runAssets").disabled = value;
-  $("download").hidden = value || !scene?.reports.export || dirty;
+  $("buildScene").disabled = value || !modelStatus.sam3d?.configured || !scene?.objects.some((o) => o.selected);
+  $("buildIsaac").disabled = $("buildScene").disabled;
+  $("openMujoco").disabled = value || dirty || !scene?.reports.export;
+  $("openIsaac").disabled = value || dirty || !scene?.reports.isaac;
+  $("importInput").disabled = value || !$("inputFile").value;
 }
 async function poll(job) {
   setBusy(true);
   const jobNames = {
+    generate: "开始完整重建流程",
+    layout: "Astra 自动识别支撑关系、修正姿态并复检",
+    recheck: "复用现有资产，重新检查桌面与物理",
     segment: "正在识别物体",
     selection_preview:"正在计算点击分割",
     proxy: "正在准备占位几何",
@@ -819,13 +760,17 @@ async function poll(job) {
     review:"Astra 正在对照原图检查多视角并验证修正",
   };
   notice(jobNames[job.kind] || "正在处理", "busy");
+  if(["generate","recheck","layout"].includes(job.kind)) {$("resultState").textContent="正在生成"; $("resultMetrics").textContent="SAM 3D → Astra 资产优化 → 布局与物理检查 → 多视角评估；运行期间可查看上方进度。"; $("resultOutput").hidden=true;}
   try {
     while (job.state === "queued" || job.state === "running") {
       await new Promise((resolve) => setTimeout(resolve, 1000));
       job = await api(`/api/jobs/${job.id}`);
-      if (job.progress) notice(job.progress.stage+(job.progress.current ? ` ${job.progress.current}/${job.progress.total}` : ""),"busy");
+      if (job.progress) {
+        const stage=job.progress.stage+(job.progress.current ? ` ${job.progress.current}/${job.progress.total}` : "");
+        notice(stage,"busy");
+        if(["generate","recheck","layout"].includes(job.kind)) $("resultState").textContent=stage;
+      }
     }
-    if (job.state === "failed") throw new Error(job.error);
     const result = await api(`/api/projects/${job.scene_id}`);
     scene = result.scene;
     dirty = false;
@@ -833,6 +778,7 @@ async function poll(job) {
     await loadImages();
     renderObjects();
     await refreshProjects();
+    if (job.state === "failed") throw new Error(job.error);
     const detail =
       job.kind === "segment"
         ? `新增 ${scene.reports.segmentation?.added_count || 0} 个物体；检测到的机械臂已排除。可删除多余项或框选补充。`
@@ -845,6 +791,7 @@ async function poll(job) {
             : "操作完成，结果已保存。";
     notice(detail);
   } catch (error) {
+    if(["generate","recheck","layout"].includes(job.kind)) {$("resultState").textContent="生成失败";$("resultMetrics").textContent=error.message;}
     notice(error.message, "error");
     throw error;
   } finally {
@@ -873,29 +820,14 @@ async function autoDetect() {
   }
 }
 $("autoDetect").onclick = autoDetect;
-$("buildScene").onclick = async () => {
+async function generateTarget(target) {
   building = true;
   setBusy(true);
   try {
     await save();
-    const needsRealMeshes = scene.objects.some(o => o.selected && (o.geometry === "none" || o.geometry === "proxy"));
-    const actions = modelStatus.sam3d?.configured
-      ? [...(needsRealMeshes ? ["reconstruct"] : []), "optimize", "settle", "validate", "review"]
-      : ["proxy", "initialize", "optimize", "validate"];
-    for (const action of actions)
-      await poll(
-        await api(
-          `/api/projects/${scene.id}/actions/${action}`,
-          json("POST", { seconds: 3 }),
-        ),
-      );
+    await poll(await api(`/api/projects/${scene.id}/generate`, json("POST", {revision:scene.revision, seconds:10, target})));
     showView(true);
-    notice(
-      scene.reports.validation.physics_check_pass
-        ? "场景已生成，短时物理检查通过。可以下载 MuJoCo 场景。"
-        : "场景已生成，但物理检查发现问题，请查看检查结果。",
-      scene.reports.validation.physics_check_pass ? "" : "error",
-    );
+    notice('场景已生成，可在 Result 打开预览。');
   } catch (error) {
     notice(error.message, "error");
   } finally {
@@ -903,6 +835,8 @@ $("buildScene").onclick = async () => {
     setBusy(false);
   }
 };
+$("buildScene").onclick=()=>generateTarget("mujoco");
+$("buildIsaac").onclick=()=>generateTarget("isaac");
 function showView(preview) {
   $("imageWrap").hidden = preview;
   $("viewport").hidden = !preview;
@@ -916,8 +850,6 @@ $("resetView").onclick = resetCamera;
 $("help").onclick = () => $("helpDialog").showModal();
 $("closeHelp").onclick = () => $("helpDialog").close();
 $("closeProperties").onclick = () => $("propertyDialog").close();
-$("showReport").onclick = () => $("reportDialog").showModal();
-$("closeReport").onclick = () => $("reportDialog").close();
 window.addEventListener("beforeunload", (event) => {
   if (dirty) {
     event.preventDefault();
@@ -933,9 +865,8 @@ async function boot() {
           `<div class="model"><span class="dot ${modelStatus[key].configured ? "ok" : ""}"></span><div>${key === "sam3" ? "SAM3" : "SAM 3D Objects"}<small>${modelStatus[key].configured ? (modelStatus[key].real_inference_verified ? "本机真实推理已通过" : "环境已配置") : key === "sam3d" ? (modelStatus[key].weights_present ? "权重已下载，推理环境待配置" : "等待权重与运行环境") : "未配置本地模型"}</small></div></div>`,
       )
       .join("");
-    $("buildScene").textContent = modelStatus.sam3d?.configured
-      ? "生成场景"
-      : "生成占位场景";
+    $("buildScene").textContent = "确认并生成 MuJoCo";
+    await refreshInputs();
     await refreshProjects();
     const id = localStorage.getItem("r2s-project");
     if (id) {
@@ -953,26 +884,88 @@ async function boot() {
 }
 boot();
 
-$("showViews").onclick=()=>{
-  const views=scene.reports.views, review=scene.reports.astra_review;
-  $("viewsReport").innerHTML=(review ? `<p><strong>Astra 修正前评估：${escape(({good:"较好",partial:"部分匹配",poor:"较差"})[review.review.visual_match] || review.review.visual_match)}</strong> · ${escape(review.review.assessment)}</p><p>${review.accepted?"已采纳并复检位姿修正":"保持原位姿"} · ${escape(review.reason)}</p><p>修正前后平均轮廓匹配：${Number(review.before.mean_iou).toFixed(3)} → ${Number(review.proposal.mean_iou).toFixed(3)}。下方展示修正后的场景；物理结果见“检查结果”。</p><ul>${review.review.limitations.map(x=>`<li>${escape(x)}</li>`).join("")}</ul>`: '<p>尚未运行 Astra 视觉检查。</p>') + `<img src="${fileURL(views.path+'/views.png')}" alt="MuJoCo 原图视角、俯视、侧视和背面" style="width:100%;height:auto">`;
-  $("viewsDialog").showModal();
-};
-$("closeViews").onclick=()=>$("viewsDialog").close();
-
-function showAssetReport() {
-  const report=scene.reports.asset_refinement;
-  const previous=new Set(report?.objects.map(o=>o.id) || []);
-  const assetName=(o)=>{const recipe=report?.objects.find(x=>x.id===o.id)?.recipe;return recipe?.template==="button_box"?`${recipe.button_color==="red"?"红色":"绿色"}按钮盒`:displayName(o.name);};
-  $("assetChoices").innerHTML=scene.objects.filter(o=>o.selected && o.geometry==="sam3d").map(o=>`<label><input type="checkbox" data-asset-id="${escape(o.id)}" ${!previous.size || previous.has(o.id)?"checked":""}>${escape(assetName(o))}</label>`).join("");
-  $("assetReport").innerHTML=report?`<p><strong>资产候选已生成 · 当前场景保持原样</strong></p><p>每行：参考图 / SAM 3D 原始资产 / Astra 优化候选。前后渲染使用相同视角、光照和显示比例；单图估计尺寸，尚未做新资产的物理验证。</p><img src="${fileURL(report.comparison)}" alt="锤子与按钮盒优化前后对比" style="width:100%;height:49vh;object-fit:contain"><a href="${fileURL(report.comparison)}" target="_blank">打开完整对照图</a><details><summary>Astra 的判断与资产下载</summary>`+report.objects.map(o=>`<p><strong>${escape(assetName(scene.objects.find(x=>x.id===o.id) || {id:o.id,name:o.id}))}</strong>：${escape(o.recipe.assessment)} ${o.status==="kept"?"（保留原样）":`<a href="${fileURL(o.candidate.canonical_glb)}" download>下载 GLB</a>`}</p>`).join("")+"</details>":"";
+let inputCatalog = null;
+async function refreshInputs() {
+  inputCatalog = await api('/api/inputs');
+  renderInputs();
 }
-$("showAssets").onclick=()=>{showAssetReport();$("assetDialog").showModal();};
-$("closeAssets").onclick=()=>$("assetDialog").close();
-$("runAssets").onclick=async()=>{
-  const ids=[...$("assetChoices").querySelectorAll("input:checked")].map(x=>x.dataset.assetId);
-  if(!ids.length)return notice("请至少选择一个资产。","error");
-  $("assetDialog").close();
-  try {await save();await poll(await api(`/api/projects/${scene.id}/actions/asset_refine`,json("POST",{object_ids:ids})));showAssetReport();$("assetDialog").showModal();}
-  catch(error){notice(error.message,"error");}
+function renderInputs() {
+  const kind=$('inputKind').value, previous=$('inputFile').value;
+  const names=inputCatalog?.[kind] || [];
+  $('inputFile').innerHTML=names.length ? names.map(n=>`<option value="${escape(n)}">${escape(n)}</option>`).join('') : '<option value="">目录为空，请放入输入文件后刷新</option>';
+  if(names.includes(previous)) $('inputFile').value=previous;
+  $('inputLocation').textContent=`${inputCatalog?.root || 'data'}/${kind}/`+(kind==='depth'?' · 每次采集一个子文件夹，包含 RGB、深度和标定元数据':' · JPG / PNG / WebP');
+  setBusy(busy);
+}
+$('inputKind').onchange=renderInputs;
+$('inputFile').onchange=()=>setBusy(busy);
+$('refreshInputs').onclick=()=>refreshInputs().catch(e=>notice(e.message,'error'));
+$('importInput').onclick=async()=>{
+  setBusy(true);
+  try {
+    await saveIfPresent();
+    notice('正在导入输入；RGB-D 会先对齐深度与图像','busy');
+    const created=await api('/api/inputs/import',json('POST',{kind:$('inputKind').value,name:$('inputFile').value}));
+    await openProject(created.id);showView(false);await refreshProjects();await autoDetect();
+  } catch(e){notice(e.message,'error');} finally{setBusy(false);}
 };
+function renderResult() {
+  const reports=scene?.reports || {}, validation=reports.validation;
+  $('resultOutput').hidden=true;
+  if(dirty || !reports.export) {
+    $('resultState').textContent=dirty?'参数已修改，需重新生成':'尚未生成当前版本';
+    $('resultMetrics').textContent='调整物体后，点击「确认并生成 MuJoCo」。资产优化与质量检查会自动执行。';
+    return;
+  }
+  $('resultState').textContent=reports.workflow_quality?.status==='needs_review' || reports.depth_quality?.status==='needs_review' || validation?.physics_check_pass===false || reports.isaac?.validation.dynamics_check_pass===false ? '已生成 · 有待复核项' : '已生成';
+  const number=(v,digits=3)=>Number.isFinite(v)?v.toFixed(digits):'未评估';
+  const quality=reports.workflow_quality;
+  const metrics=[['输入路径',scene.preprocessing?.input_path==='rgbd'?'RGB-D（实测深度）':'单图（尺度估计）'],
+    ['选中物体',scene.objects.filter(o=>o.selected).length],
+    ['物理检查',validation ? (validation.physics_check_pass?'通过':'未通过') : '未评估'],
+    ['平均轮廓 IoU',number(reports.silhouette?.mean_iou)],
+    ['初始最大穿插',validation ? number(validation.initial_max_penetration_m*1000,2)+' mm' : '未评估'],
+    ['Astra 资产检查',quality ? (quality.all_selected_assets_reviewed?'已检查全部选中物体':'有未检查物体') : '未记录']];
+  if(scene.preprocessing?.input_path==='rgbd') {
+    metrics.push(['深度匹配',reports.depth_quality?.status==='needs_review'?'需复核':reports.depth_quality?'在复核阈值内':'未评估']);
+    for(const row of reports.depth_after_physics?.objects || []) metrics.push([`${row.name} · 深度误差 / 覆盖率`,`${Number.isFinite(row.median_abs_z_error_m)?number(row.median_abs_z_error_m*1000,1)+' mm':'无有效深度'} / ${number(row.coverage*100,1)}%`]);
+  }
+  if(reports.isaac) metrics.push(['Isaac 动态检查',reports.isaac.validation.dynamics_check_pass?'通过':'未通过'],['Isaac 完整物理检查',reports.isaac.validation.physics_check_pass===true?'通过':'未完整验证']);
+  if(reports.relations) metrics.push(['自动支撑与摆放',reports.relations.accepted?'修正后通过场景检查':'候选未通过，原布局保留']);
+  const labels={assets_without_astra_review:'部分资产未经 Astra 检查',assets_kept_with_unresolved_defects:'部分资产缺陷尚未修复',depth_mismatch:'深度匹配需复核',silhouette_review_required:'轮廓匹配需复核',astra_visual_review_required:'Astra 视觉匹配需复核',final_astra_review_missing:'缺少最终 Astra 检查',physics_failed:'物理检查未通过',automatic_layout_unresolved:'自动摆放候选未通过检查，保留旧布局与候选证据'};
+  $('resultMetrics').innerHTML=metrics.map(([k,v])=>`<div class="metric"><span>${escape(k)}</span><strong>${escape(String(v))}</strong></div>`).join('')+
+    ((quality?.flags?.length)?`<p class="status-fail">${quality.flags.map(f=>escape(labels[f] || f)).join('；')}</p>`:'')+
+    '<p class="smallnote">视觉匹配、深度误差和物理稳定性分别评估；通过检查不等于真实物理参数已测定。</p>';
+  const id=scene.id, revision=scene.revision;
+  api(`/api/projects/${id}/result`).then(result=>{
+    if(scene?.id!==id || scene.revision!==revision || dirty)return;
+    $('outputPath').textContent=result.xml || result.project;
+    $('viewCommand').value=result.view_command || '';
+    $('resultOutput').hidden=!result.xml && !result.usd;
+    $('isaacPath').textContent=result.usd || '';
+    $('openMujoco').disabled=!result.xml || busy;
+    $('openIsaac').disabled=!result.usd || busy;
+  }).catch(e=>notice(e.message,'error'));
+}
+$('copyViewCommand').onclick=async()=>{
+  try{await navigator.clipboard.writeText($('viewCommand').value);notice('MuJoCo 打开命令已复制，请在本机终端运行。');}
+  catch{ $('viewCommand').focus();$('viewCommand').select();notice('请复制已选中的命令。');}
+};
+
+
+async function openNative(engine) {
+  const button=$(engine==='isaac'?'openIsaac':'openMujoco');button.disabled=true;
+  try {
+    let state=await api(`/api/projects/${scene.id}/preview/${engine}`,json('POST',{revision:scene.revision}));
+    $('previewState').textContent='正在启动 '+(engine==='isaac'?'Isaac Sim':'MuJoCo')+' 桌面窗口…';
+    while(state.state==='starting') {
+      await new Promise(resolve=>setTimeout(resolve,1000));
+      state=await api(`/api/projects/${scene.id}/preview/${engine}`);
+    }
+    if(state.state!=='ready')throw new Error(state.error || '预览未能启动，请查看运行日志');
+    $('previewState').textContent=(engine==='isaac'?'Isaac Sim':'MuJoCo')+' 预览已打开，可在桌面窗口操作。';
+  } catch(e){$('previewState').textContent=e.message;notice(e.message,'error');}
+  finally{button.disabled=false;}
+}
+$('openMujoco').onclick=()=>openNative('mujoco');
+$('openIsaac').onclick=()=>openNative('isaac');

@@ -70,14 +70,21 @@ def test_build_routes_sensor_geometry_only_for_depth(tmp_path,monkeypatch,metric
     import io
     image=io.BytesIO();Image.new('RGB',(20,20)).save(image,format='PNG')
     store=Store(tmp_path/'runs');scene=store.create(image.getvalue(),'route test')
-    if metric:scene.preprocessing['depth_registration']='input/rgbd/registered_depth.npz'
+    from real2sim_workbench.models import ObjectRecord
+    project=store.path(scene.id)
+    Image.new('L',(20,20),255).save(project/'mask.png')
+    scene.objects=[ObjectRecord(id='o_000000000001',name='test',mask='mask.png',bbox=[0,0,20,20])]
+    if metric:
+        scene.preprocessing['depth_registration']='input/rgbd/registered_depth.npz'
+        (project/'input/rgbd').mkdir()
+        np.savez(project/'input/rgbd/registered_depth.npz',depth_m=np.ones((20,20)))
     monkeypatch.setattr(pipeline,'create_input',lambda *args:(store,scene))
     requests=[]
     def worker(kind,request,job,**kwargs):
         requests.append((kind,request));return {}
     monkeypatch.setattr(pipeline.adapters,'run_worker',worker)
     monkeypatch.setattr(pipeline,'assemble',lambda *args:None)
-    monkeypatch.setattr(pipeline,'finish_scene',lambda store,scene,*args:scene)
+    monkeypatch.setattr(pipeline,'finish_scene',lambda store,scene,*args,**kwargs:scene)
     pipeline.build(tmp_path)
     assert requests[0][0]=='sam3d'
     assert ('registered_depth' in requests[0][1]) is metric

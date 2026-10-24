@@ -1,0 +1,34 @@
+{
+  "date": "2026-10-23",
+  "scope": "GUI integration; no full SAM 3D/Astra inference rerun",
+  "fast_tests": {
+    "passed": 42,
+    "warnings": [
+      "Starlette TestClient httpx deprecation"
+    ]
+  },
+  "browser_checks": [
+    "single-image import and actual SAM3 automatic segmentation",
+    "RGB-D import with actual calibration and SAM3 automatic segmentation",
+    "remove and undo selection",
+    "historical RGB-D quality display and MuJoCo command"
+  ],
+  "gui_test_projects": [
+    {
+      "id": "2f94c0c0bb904173",
+      "name": "tabletop · RGB-D",
+      "objects": 6
+    },
+    {
+      "id": "359e05d50d324944",
+      "name": "tabletop · 单图",
+      "objects": 8
+    }
+  ],
+  "complete_generation_contract": "Automated with stubbed model/stage responses, includes selected IDs, depth forwarding, revisions, repeat-run isolation and failed-quality exports",
+  "screenshots": [
+    "outputs/gui-v0/input.png",
+    "outputs/gui-v0/result.png"
+  ],
+  "full_new_model_run_performed": false
+}

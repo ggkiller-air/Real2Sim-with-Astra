@@ -151,7 +151,8 @@ def assemble_metric(scene,project,job,result):
         np.savez_compressed(job/(obj.id+'_observed.npz'),points=observed)
         rows.append({'id':obj.id,'name':obj.name,**fit,'observed_mask_fraction':float((mask&valid).sum()/max(1,mask.sum())),'sensor_height_98_m':float(np.quantile(observed[:,2],.98)),'support_translation_z_m':correction})
     surface=world_points[table];lo,hi=np.quantile(surface[:,:2],[.01,.99],axis=0)
-    scene.table.width=float(2*max(abs(lo[0]),abs(hi[0]))+.03);scene.table.depth=float(2*max(abs(lo[1]),abs(hi[1]))+.03)
+    if scene.table.calibration_source!='user':
+        scene.table.width=float(2*max(abs(lo[0]),abs(hi[0]))+.03);scene.table.depth=float(2*max(abs(lo[1]),abs(hi[1]))+.03)
     scene.preprocessing['metric_frame']=frame
     scene.reports['reconstruction']={'job':job.name,'input_path':'rgbd','real_mesh_count':len(rows),'frame':frame,'objects':rows,'table_extent_source':'observed support footprint plus 3 cm margin; not full unseen table dimensions'}
     return scene.reports['reconstruction']
@@ -163,9 +164,10 @@ def depth_agreement(scene,project,xml):
     project=Path(project);sensor=np.load(project/scene.preprocessing['depth_registration'],allow_pickle=False)
     model=mujoco.MjModel.from_xml_path(str(xml));data=mujoco.MjData(model);mujoco.mj_forward(model,data)
     width,height=scene.image_size;option=mujoco.MjvOption();option.geomgroup[3]=0
-    with mujoco.Renderer(model,width=width,height=height) as renderer:
-        renderer.enable_depth_rendering();renderer.update_scene(data,camera='source',scene_option=option);depth=renderer.render().copy()
-        renderer.disable_depth_rendering();renderer.enable_segmentation_rendering();renderer.update_scene(data,camera='source',scene_option=option);seg=renderer.render().copy()
+    from . import rendering
+    with rendering.renderer(model,scene.image_size) as renderer:
+        renderer.enable_depth_rendering();renderer.update_scene(data,camera='source',scene_option=option);depth=rendering.source_pixels(renderer.render(),scene.image_size)
+        renderer.disable_depth_rendering();renderer.enable_segmentation_rendering();renderer.update_scene(data,camera='source',scene_option=option);seg=rendering.source_pixels(renderer.render(),scene.image_size)
     rows=[]
     for obj in scene.objects:
         if not obj.selected:continue
@@ -174,4 +176,4 @@ def depth_agreement(scene,project,xml):
         shared=mask&np.isin(seg[:,:,0],geoms)&(seg[:,:,1]==int(mujoco.mjtObj.mjOBJ_GEOM))
         error=abs(depth[shared]-sensor['depth_m'][shared])
         rows.append({'id':obj.id,'name':obj.name,'shared_pixels':int(shared.sum()),'observed_mask_pixels':int(mask.sum()),'coverage':float(shared.sum()/max(1,mask.sum())),'median_abs_z_error_m':float(np.median(error)) if len(error) else None,'p90_abs_z_error_m':float(np.quantile(error,.9)) if len(error) else None})
-    return {'objects':rows,'note':'Sensor agreement on shared visible pixels; excludes missing depth, hidden surfaces and independent metrology.'}
+    return {'objects':rows,'render_size':list(rendering.render_size(scene.image_size)),'source_image_size':scene.image_size,'note':'Sensor agreement on shared visible pixels; excludes missing depth, hidden surfaces and independent metrology.'}

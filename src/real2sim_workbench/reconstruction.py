@@ -80,8 +80,9 @@ def assemble(scene, project_folder, job_folder, result):
                             'mass_friction_source':obj.parameter_source}
     chosen=[o for o in scene.objects if o.selected]
     # Accommodate the generated footprint without asking the user for background controls.
-    scene.table.depth=max(scene.table.depth,2*max(abs(o.position[1])+o.size[1]/2 for o in chosen)+.12)
-    scene.table.width=max(scene.table.width,2*max(abs(o.position[0])+o.size[0]/2 for o in chosen)+.12)
+    if scene.table.calibration_source!='user':
+        scene.table.depth=max(scene.table.depth,2*max(abs(o.position[1])+o.size[1]/2 for o in chosen)+.12)
+        scene.table.width=max(scene.table.width,2*max(abs(o.position[0])+o.size[0]/2 for o in chosen)+.12)
     scene.reports['reconstruction']={'job':job_folder.name,'raw_layout_applied':True,'frame':report,
                                     'real_mesh_count':len(result['objects']),'unseen_surfaces':'model inferred'}
     return scene.reports['reconstruction']

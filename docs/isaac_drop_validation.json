@@ -1,0 +1,241 @@
+{
+  "date": "2026-10-24",
+  "source": "runs/bfedc223ba8e4077/jobs/eea4f18cbce947bb/isaac/scene.usdc",
+  "source_sha256": "a2f8b67c13ec68167256cbfdee747b3e3bd6c12c7b5dbf19377c15e7ba476c17",
+  "source_unchanged": true,
+  "method": "Native GUI SimulationApp, same context and render=True loop as preview; timeline API play and root USD transform edit, not a mouse-drag test.",
+  "settings": {
+    "/app/player/playSimulations": true,
+    "/physics/updateToUsd": true,
+    "/physics/suppressReadback": false
+  },
+  "cases": [
+    {
+      "mode": "physics_pose",
+      "base": {
+        "physics_steps": 1440,
+        "physics_time": 2.8840001369826496,
+        "playing": false,
+        "position": [
+          0.30719953775405884,
+          -0.026245981454849243,
+          0.08092524856328964
+        ],
+        "velocity": [
+          -2.925339686044026e-07,
+          -7.205569090729114e-06,
+          -1.5132802673178958e-06,
+          1.6746811525081284e-05,
+          -4.12363533541793e-06,
+          3.1461539037991315e-05
+        ],
+        "usd_position": [
+          0.30719953775405884,
+          -0.026245981454849243,
+          0.08092524856328964
+        ]
+      },
+      "raised": {
+        "physics_steps": 1440,
+        "physics_time": 2.8840001369826496,
+        "playing": false,
+        "position": [
+          0.30719953775405884,
+          -0.026245979592204094,
+          0.2809252142906189
+        ],
+        "velocity": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "usd_position": [
+          0.30719953775405884,
+          -0.026245981454849243,
+          0.08092524856328964
+        ]
+      },
+      "final": {
+        "physics_steps": 2880,
+        "physics_time": 5.764000273775309,
+        "playing": true,
+        "position": [
+          0.30719953775405884,
+          -0.026245981454849243,
+          0.08092530071735382
+        ],
+        "velocity": [
+          -3.346571247675456e-06,
+          -5.286232408252545e-06,
+          -1.304733245888201e-06,
+          1.606623118277639e-05,
+          -8.463241101708263e-06,
+          1.9956227333750576e-05
+        ],
+        "usd_position": [
+          0.30719953775405884,
+          -0.026245981454849243,
+          0.08092530071735382
+        ]
+      },
+      "drop_from_target_m": 0.19999994784593583,
+      "physics_steps_advanced": 1440
+    },
+    {
+      "mode": "usd_root_paused",
+      "base": {
+        "physics_steps": 4320,
+        "physics_time": 8.644000410567969,
+        "playing": false,
+        "position": [
+          0.30719953775405884,
+          -0.026245981454849243,
+          0.08092524856328964
+        ],
+        "velocity": [
+          -2.925339686044026e-07,
+          -7.205569090729114e-06,
+          -1.5132802673178958e-06,
+          1.6746811525081284e-05,
+          -4.12363533541793e-06,
+          3.1461539037991315e-05
+        ],
+        "usd_position": [
+          0.30719953775405884,
+          -0.026245981454849243,
+          0.08092524856328964
+        ]
+      },
+      "raised": {
+        "physics_steps": 4320,
+        "physics_time": 8.644000410567969,
+        "playing": false,
+        "position": [
+          0.30719953775405884,
+          -0.026245981454849243,
+          0.2809252440929413
+        ],
+        "velocity": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "usd_position": [
+          0.30719953775405884,
+          -0.026245981454849243,
+          0.28092524856328965
+        ]
+      },
+      "final": {
+        "physics_steps": 5760,
+        "physics_time": 11.524000547360629,
+        "playing": true,
+        "position": [
+          0.30719950795173645,
+          -0.026246005669236183,
+          0.08092525601387024
+        ],
+        "velocity": [
+          -4.842404450755566e-06,
+          -4.144952981732786e-06,
+          -1.421198703610571e-06,
+          1.7467715224483982e-05,
+          -1.521353851785534e-06,
+          1.2272128515178338e-05
+        ],
+        "usd_position": [
+          0.30719950795173645,
+          -0.026246005669236183,
+          0.08092525601387024
+        ]
+      },
+      "drop_from_target_m": 0.19999999254941941,
+      "physics_steps_advanced": 1440
+    },
+    {
+      "mode": "usd_root_playing",
+      "base": {
+        "physics_steps": 7200,
+        "physics_time": 14.404000684153289,
+        "playing": false,
+        "position": [
+          0.30719953775405884,
+          -0.026245981454849243,
+          0.08092524856328964
+        ],
+        "velocity": [
+          -2.925339686044026e-07,
+          -7.205569090729114e-06,
+          -1.5132802673178958e-06,
+          1.6746811525081284e-05,
+          -4.12363533541793e-06,
+          3.1461539037991315e-05
+        ],
+        "usd_position": [
+          0.30719953775405884,
+          -0.026245981454849243,
+          0.08092524856328964
+        ]
+      },
+      "raised": {
+        "physics_steps": 7200,
+        "physics_time": 14.404000684153289,
+        "playing": true,
+        "position": [
+          0.30719953775405884,
+          -0.026245981454849243,
+          0.2809252440929413
+        ],
+        "velocity": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "usd_position": [
+          0.30719953775405884,
+          -0.026245981454849243,
+          0.28092524856328965
+        ]
+      },
+      "final": {
+        "physics_steps": 8640,
+        "physics_time": 17.28400082094595,
+        "playing": true,
+        "position": [
+          0.30719950795173645,
+          -0.026246005669236183,
+          0.08092525601387024
+        ],
+        "velocity": [
+          -4.842404450755566e-06,
+          -4.144952981732786e-06,
+          -1.421198703610571e-06,
+          1.7467715224483982e-05,
+          -1.521353851785534e-06,
+          1.2272128515178338e-05
+        ],
+        "usd_position": [
+          0.30719950795173645,
+          -0.026246005669236183,
+          0.08092525601387024
+        ]
+      },
+      "drop_from_target_m": 0.19999999254941941,
+      "physics_steps_advanced": 1440
+    }
+  ],
+  "raw_evidence_local_only": "outputs/isaac_drop_check/",
+  "limitations": [
+    "Timeline and body transforms were controlled through Isaac APIs; actual mouse dragging was not reproduced.",
+    "Demonstrates native gravity, contact and visible descent for this scene, not complete PhysX initial penetration qualification."
+  ]
+}

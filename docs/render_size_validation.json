@@ -1,0 +1,43 @@
+{
+  "date": "2026-10-24",
+  "fix": "bounded aspect-preserving offscreen rendering and editable support table",
+  "tests_passed": 48,
+  "native_test_sizes": [
+    [
+      1080,
+      1440
+    ],
+    [
+      1920,
+      1080
+    ],
+    [
+      4000,
+      600
+    ]
+  ],
+  "max_render_side": 1600,
+  "source_pixels_preserved": true,
+  "project": "runs/2a3936717f5044e1",
+  "output": "runs/2a3936717f5044e1/jobs/3f9373c1b5c747f8/simulation",
+  "original_assets_and_poses_unchanged": true,
+  "actual_image_size": [
+    1080,
+    1440
+  ],
+  "actual_render_size": [
+    1080,
+    1440
+  ],
+  "render_error_resolved": true,
+  "physics_pass": false,
+  "initial_max_penetration_m": 0.044613353466969465,
+  "mean_iou": 0.18184966365871433,
+  "final_astra_called": true,
+  "final_astra_visual_match": "poor",
+  "limitations": [
+    "Input-size failure is fixed; shelf/cup geometry, multi-level support and penetration remain unresolved.",
+    "Rendering above 1600 px long edge is approximate; reports retain render size.",
+    "Recheck preserves manual poses and never reruns asset generation."
+  ]
+}

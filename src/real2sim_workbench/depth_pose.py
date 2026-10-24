@@ -137,18 +137,19 @@ def refine_supported_yaw(scene, project, xml, obj):
     jac=np.column_stack([(screen(anchor+np.eye(3)[i]*.0001)-screen(anchor))/.0001 for i in (0,1)])
     option=mujoco.MjvOption();option.geomgroup[3]=0;best=None
     w,h=scene.image_size
-    with mujoco.Renderer(m,width=w,height=h) as renderer:
+    from . import rendering
+    with rendering.renderer(m,scene.image_size) as renderer:
         for yaw in np.linspace(-np.pi/3,np.pi/3,13):
             rotation=Rotation.from_euler('z',yaw)*original;q=rotation.as_quat();position=anchor.copy()
             for _ in range(3):
                 d.qpos[adr:adr+3]=position;d.qpos[adr+3:adr+7]=q[[3,0,1,2]];mujoco.mj_forward(m,d)
-                renderer.disable_depth_rendering();renderer.enable_segmentation_rendering();renderer.update_scene(d,camera='source',scene_option=option);seg=renderer.render()
+                renderer.disable_depth_rendering();renderer.enable_segmentation_rendering();renderer.update_scene(d,camera='source',scene_option=option);seg=rendering.source_pixels(renderer.render(),scene.image_size)
                 mask=np.isin(seg[:,:,0],geoms)&(seg[:,:,1]==int(mujoco.mjtObj.mjOBJ_GEOM));ys,xs=np.where(mask)
                 if not len(xs):break
                 delta=np.linalg.lstsq(jac,target-[xs.mean(),ys.mean()],rcond=None)[0]
                 if _<2:position[:2]=np.clip(position[:2]+delta,anchor[:2]-.04,anchor[:2]+.04)
             if not len(xs):continue
-            renderer.disable_segmentation_rendering();renderer.enable_depth_rendering();renderer.update_scene(d,camera='source',scene_option=option);depth=renderer.render()
+            renderer.disable_segmentation_rendering();renderer.enable_depth_rendering();renderer.update_scene(d,camera='source',scene_option=option);depth=rendering.source_pixels(renderer.render(),scene.image_size)
             shared=mask&observed;error=float(np.median(abs(depth[shared]-sensor['depth_m'][shared]))) if shared.any() else 1.
             iou=(mask&expected).sum()/max(1,(mask|expected).sum());coverage=shared.sum()/max(1,observed.sum())
             loss=(1-iou)*.06+error+(1-coverage)*.01

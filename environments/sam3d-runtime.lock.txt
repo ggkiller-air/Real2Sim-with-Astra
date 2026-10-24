@@ -221,3 +221,7 @@ xatlas==0.0.9
 yacs==0.1.8
 yarl==1.25.1
 zipp==4.1.2
+
+# Proxy transports used by HTTPX (Gradio) and Requests (model downloads).
+socksio==1.0.0
+PySocks==1.7.1
